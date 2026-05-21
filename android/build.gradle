@@ -1,0 +1,46 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+  repositories {
+    google()
+    mavenCentral()
+  }
+  dependencies {
+    classpath('com.android.tools.build:gradle')
+    classpath('com.facebook.react:react-native-gradle-plugin')
+    classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
+  }
+}
+
+allprojects {
+  repositories {
+    google()
+    mavenCentral()
+    maven { url 'https://www.jitpack.io' }
+  }
+
+  configurations.all { config ->
+    if (config.canBeResolved || config.canBeConsumed) {
+      def agpAttr = attributes.keySet().find { it.name.contains("AgpVersionAttr") }
+      if (!agpAttr) {
+        // Find if any other configuration HAS it to match the type
+        def type = String.class
+        try {
+          type = Class.forName("com.android.build.api.attributes.AgpVersionAttr")
+        } catch (Exception e) {}
+        
+        def attr = Attribute.of("com.android.build.api.attributes.AgpVersionAttr", type)
+        try {
+          if (type == String.class) {
+            attributes.attribute(attr, "8.11.0")
+          } else {
+            attributes.attribute(attr, objects.named(type, "8.11.0"))
+          }
+        } catch (Exception e) {}
+      }
+    }
+  }
+}
+
+apply plugin: "expo-root-project"
+apply plugin: "com.facebook.react.rootproject"
