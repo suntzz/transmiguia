@@ -5,15 +5,6 @@
 Aplicación móvil desarrollada con **React Native + Expo + TypeScript** para apoyar la navegación asistida por voz dentro del sistema **TransMilenio** en Bogotá, con especial enfoque en accesibilidad para personas con discapacidad visual.
 
 ---
-
-## Descripción del proyecto
-
-**TransmiGuía** busca acompañar al usuario durante todo el trayecto, no solo mostrarle una ruta. La aplicación permite seleccionar un destino por voz o por texto, identifica la estación más cercana, construye un plan de viaje con caminata, bus y transbordos, y luego entrega indicaciones cortas mediante **voz, vibración y seguimiento contextual**.
-
-El propósito académico del proyecto es diseñar una solución de navegación más accesible, simple y útil en un entorno real de transporte masivo, donde muchas decisiones normalmente dependen de referencias visuales.
-
----
-
 ## Problema que aborda
 
 Usar TransMilenio puede ser retador por la cantidad de estaciones, rutas y transbordos. Para una persona con discapacidad visual, estas dificultades aumentan porque gran parte de la información del sistema se presenta de forma visual o requiere interpretar rápidamente el entorno.
