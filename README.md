@@ -22,12 +22,6 @@ Las aplicaciones de mapas tradicionales ayudan en trayectos generales, pero no s
 
 ---
 
-## Objetivo académico
-
-Desarrollar una aplicación móvil accesible que apoye la navegación dentro de TransMilenio mediante reconocimiento de voz, síntesis de voz, ubicación en tiempo real y una lógica de rutas basada en estaciones y transbordos.
-
----
-
 ## Funcionalidades principales
 
 - Selección de destino por voz o por entrada manual.
@@ -115,28 +109,6 @@ app-transmi-expo/
 
 ---
 
-## Configuración de variables de entorno
-
-Este proyecto **no debe subir claves reales** al repositorio. Para configurarlo:
-
-1. Copia [`.env.example`](/Users/suntz/Documents/Documents/code/app-transmi-expo/.env.example) a un archivo local llamado `.env.local`.
-2. Completa tus credenciales reales solo en el archivo local.
-
-Variables esperadas:
-
-```bash
-GOOGLE_MAPS_API_KEY=
-DIRECTIONS_API_KEY=
-EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY=
-EXPO_PUBLIC_GOOGLE_MAPS_DIRECTIONS_API_KEY=
-EXPO_PUBLIC_TM_STATION_STATUS_URL=
-EXPO_PUBLIC_TM_STATION_STATUS_REFRESH_HOURS=6
-```
-
-`app.config.ts` ya está preparado para leer estas variables desde `process.env`.
-
----
-
 ## Instalación y ejecución
 
 ### Requisitos
@@ -159,22 +131,6 @@ Otros comandos útiles:
 npm run lint
 npm run typecheck
 ```
-
----
-
-## Capturas de pantalla
-
-Espacio sugerido para capturas del proyecto:
-
-- `docs/screenshots/home.png`
-- `docs/screenshots/voice-flow.png`
-- `docs/screenshots/walking-guide.png`
-- `docs/screenshots/bus-tracking.png`
-
-Puedes reemplazar esta sección después por imágenes reales del flujo.
-
----
-
 ## Modo demostración
 
 La aplicación incluye un modo demo para mostrar el funcionamiento general sin depender completamente de condiciones reales de calle. Este modo simula:
@@ -186,34 +142,6 @@ La aplicación incluye un modo demo para mostrar el funcionamiento general sin d
 - transbordos,
 - llegada final.
 
-Es útil para sustentaciones, portafolio y pruebas guiadas.
-
----
-
-## Seguridad del repositorio
-
-Antes de publicar el proyecto:
-
-- no subas archivos `.env` reales,
-- no subas APKs o AABs finales,
-- no subas `keystore.properties`,
-- no subas keystores ni credenciales Android,
-- no subas archivos temporales o de logs.
-
-El archivo [`.gitignore`](/Users/suntz/Documents/Documents/code/app-transmi-expo/.gitignore) ya está preparado para cubrir estos casos.
-
----
-
-## Estado actual del proyecto
-
-Actualmente el proyecto está orientado a:
-
-- **tesis / entrega académica**,
-- **portafolio técnico**,
-- **evolución futura hacia publicación**.
-
-La base funcional ya contempla voz, rutas por estaciones, transbordos, alertas y modo demo.
-
 ---
 
 ## Autor
@@ -222,18 +150,3 @@ La base funcional ya contempla voz, rutas por estaciones, transbordos, alertas y
 **Ingeniería de Sistemas**
 
 ---
-
-## Comandos Git sugeridos
-
-Si vas a subirlo a GitHub desde cero, el flujo recomendado es:
-
-```bash
-git init
-git add .
-git commit -m "Initial commit - TransmiGuía"
-git branch -M main
-git remote add origin <URL>
-git push -u origin main
-```
-
-Si el repositorio ya existe localmente, puedes omitir `git init` y comenzar desde `git add .`.
