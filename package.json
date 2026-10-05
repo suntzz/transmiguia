@@ -8,6 +8,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "build:web": "expo export --platform web",
+    "serve:web": "npx serve -s dist -l 3000",
     "postinstall": "patch-package",
     "lint": "eslint App.tsx src app.config.ts eslint.config.js --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc --noEmit",
