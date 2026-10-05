@@ -1,3 +1,7 @@
+import { getDistanceInMeters } from '@/src/core/geo/distance';
+
+export { getDistanceInMeters };
+
 export type ProximityStage = 'far' | 'near' | 'very_near' | 'arrived';
 
 export const ALERT_THRESHOLDS = {
@@ -37,33 +41,6 @@ const PROXIMITY_STAGE_ORDER: Record<ProximityStage, number> = {
   very_near: 2,
   arrived: 3,
 };
-
-function toRadians(value: number) {
-  return (value * Math.PI) / 180;
-}
-
-export function getDistanceInMeters(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-) {
-  const earthRadius = 6371000;
-  const latitudeDelta = toRadians(lat2 - lat1);
-  const longitudeDelta = toRadians(lon2 - lon1);
-  const originLatitude = toRadians(lat1);
-  const destinationLatitude = toRadians(lat2);
-
-  const haversine =
-    Math.sin(latitudeDelta / 2) * Math.sin(latitudeDelta / 2) +
-    Math.cos(originLatitude) *
-      Math.cos(destinationLatitude) *
-      Math.sin(longitudeDelta / 2) *
-      Math.sin(longitudeDelta / 2);
-
-  const arc = 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
-  return earthRadius * arc;
-}
 
 export function getAdaptiveProximityThresholds(options?: {
   speedMps?: number | null;

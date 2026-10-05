@@ -1,194 +1,29 @@
-import * as Speech from 'expo-speech';
+import type { SpeakManagedOptions } from '@/src/domain/gateways/ITTSGateway';
+import { expoSpeechTTSGateway } from '@/src/infrastructure/hardware/ExpoSpeechTTSGateway';
 
 import {
-  BusTransitLeg,
-  RoutePlan,
-  TransmilenioStation,
-  WalkTransitLeg,
+  type BusTransitLeg,
+  type RoutePlan,
+  type TransmilenioStation,
+  type WalkTransitLeg,
   getBusLegs,
 } from '@/src/services/transmilenioService';
-import { RouteStep } from '@/src/services/mapService';
-import { ProximityStage } from '@/src/utils/proximity';
+import type { RouteStep } from '@/src/services/mapService';
+import type { ProximityStage } from '@/src/utils/proximity';
 
-const DEFAULT_OPTIONS: Speech.SpeechOptions = {
-  language: 'es-CO',
-  rate: 0.98,
-  pitch: 1,
-};
 
-type SpeechMemoryEntry = {
-  message: string;
-  timestamp: number;
-};
+export type { SpeakManagedOptions };
 
-type QueuedSpeechEntry = {
-  id: number;
-  message: string;
-};
-
-type SpeakManagedOptions = {
-  key?: string;
-  minIntervalMs?: number;
-  interrupt?: boolean;
-  pauseMs?: number;
-  ignoreGlobalCooldown?: boolean;
-};
-
-const speechMemory = new Map<string, SpeechMemoryEntry>();
-let speechQueue = Promise.resolve(false);
-let speechGeneration = 0;
-let isSpeaking = false;
-let queuedMessages: QueuedSpeechEntry[] = [];
-let nextQueuedMessageId = 0;
-let lastSpeechStartedAt = 0;
-let lastSpeechFinishedAt = 0;
-let lastGlobalMessageTimestamp = 0;
-const GLOBAL_SPEECH_COOLDOWN_MS = 3500;
-
-function logSpeech(message: string, details?: Record<string, unknown>) {
-  if (!__DEV__) {
-    return;
-  }
-
-  if (details) {
-    console.info('[Speech]', message, details);
-    return;
-  }
-
-  console.info('[Speech]', message);
+export function waitForSpeechQueue(): Promise<void> {
+  return expoSpeechTTSGateway.waitForQueue();
 }
 
-function shouldSpeak(message: string, key: string, minIntervalMs: number) {
-  const previous = speechMemory.get(key);
-
-  if (!previous) {
-    return true;
-  }
-
-  const enoughTimePassed = Date.now() - previous.timestamp >= minIntervalMs;
-  const changedMessage = previous.message !== message;
-
-  return enoughTimePassed || changedMessage;
+export function waitForNarrationPause(ms = 2000): Promise<void> {
+  return expoSpeechTTSGateway.waitForNarrationPause(ms);
 }
 
-function wait(ms: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
-function removeQueuedMessageById(queueEntryId: number) {
-  const messageIndex = queuedMessages.findIndex((entry) => entry.id === queueEntryId);
-
-  if (messageIndex === -1) {
-    return;
-  }
-
-  queuedMessages = [
-    ...queuedMessages.slice(0, messageIndex),
-    ...queuedMessages.slice(messageIndex + 1),
-  ];
-}
-
-function estimateSpeechDuration(message: string) {
-  const estimatedDurationMs = message.trim().length * 82;
-
-  return Math.min(15000, Math.max(2800, estimatedDurationMs));
-}
-
-async function speakWithPause(
-  message: string,
-  pauseMs: number,
-  generation: number,
-  ignoreGlobalCooldown = false
-) {
-  if (generation !== speechGeneration) {
-    return false;
-  }
-
-  if (lastSpeechStartedAt > 0 || lastSpeechFinishedAt > 0) {
-    const now = Date.now();
-    const timeSinceLastSpeechFinished = now - lastSpeechFinishedAt;
-    const timeSinceLastSpeechStarted = now - lastSpeechStartedAt;
-    const pauseAfterLastSpeech =
-      pauseMs > 0 ? Math.max(0, pauseMs - timeSinceLastSpeechFinished) : 0;
-    const globalCooldown =
-      ignoreGlobalCooldown || lastGlobalMessageTimestamp === 0
-        ? 0
-        : Math.max(0, GLOBAL_SPEECH_COOLDOWN_MS - timeSinceLastSpeechStarted);
-    const waitTime = Math.max(pauseAfterLastSpeech, globalCooldown);
-
-    if (waitTime > 0) {
-      await wait(waitTime);
-    }
-  }
-
-  if (generation !== speechGeneration) {
-    return false;
-  }
-
-  await new Promise<void>((resolve) => {
-    let finished = false;
-    let timeoutId: ReturnType<typeof setTimeout>;
-
-    isSpeaking = true;
-    lastSpeechStartedAt = Date.now();
-    lastGlobalMessageTimestamp = lastSpeechStartedAt;
-
-    const finish = () => {
-      if (finished) {
-        return;
-      }
-
-      finished = true;
-      clearTimeout(timeoutId);
-      isSpeaking = false;
-      lastSpeechFinishedAt = Date.now();
-      resolve();
-    };
-
-    timeoutId = setTimeout(() => {
-      if (__DEV__) {
-        console.warn('[Speech] Se uso el timeout de respaldo para cerrar una locucion.', {
-          message,
-        });
-      }
-
-      finish();
-    }, estimateSpeechDuration(message));
-
-    Speech.speak(message, {
-      ...DEFAULT_OPTIONS,
-      onDone: finish,
-      onStopped: finish,
-      onError: finish,
-    });
-  });
-
-  return generation === speechGeneration;
-}
-
-export async function waitForSpeechQueue() {
-  let pendingQueue = speechQueue;
-
-  while (true) {
-    await pendingQueue;
-
-    if (pendingQueue === speechQueue && !isSpeaking && queuedMessages.length === 0) {
-      return;
-    }
-
-    pendingQueue = speechQueue;
-  }
-}
-
-export function waitForNarrationPause(ms = 2000) {
-  return wait(ms);
-}
-
-export async function waitForSpeechToSettle(ms = 2000) {
-  await waitForSpeechQueue();
-  await waitForNarrationPause(ms);
+export function waitForSpeechToSettle(ms = 2000): Promise<void> {
+  return expoSpeechTTSGateway.waitForSpeechToSettle(ms);
 }
 
 function getDirectionLabel(direction: BusTransitLeg['direction']) {
@@ -243,101 +78,24 @@ function buildWalkTransferInstruction(leg: WalkTransitLeg) {
   return `Haz transbordo caminando hasta ${leg.to.name}.`;
 }
 
-export async function speakManagedText(
+export function speakManagedText(
   message: string,
-  {
-    key = message,
-    minIntervalMs = 12000,
-    interrupt = false,
-    pauseMs = 1200,
-    ignoreGlobalCooldown = false,
-  }: SpeakManagedOptions = {}
-) {
-  if (!shouldSpeak(message, key, minIntervalMs)) {
-    return false;
-  }
-
-  if (interrupt) {
-    await stopSpeaking();
-  }
-
-  const generation = speechGeneration;
-  const queueEntry = {
-    id: (nextQueuedMessageId += 1),
-    message,
-  };
-  queuedMessages = [...queuedMessages, queueEntry];
-
-  speechQueue = speechQueue.then(async () => {
-    const nextQueuedMessage = queuedMessages[0];
-
-    if (generation !== speechGeneration) {
-      queuedMessages =
-        nextQueuedMessage?.id === queueEntry.id ? queuedMessages.slice(1) : queuedMessages;
-      return false;
-    }
-
-    speechMemory.set(key, {
-      message,
-      timestamp: Date.now(),
-    });
-    logSpeech('enqueue', {
-      key,
-      message,
-      pauseMs,
-      interrupt,
-      queueSize: queuedMessages.length,
-    });
-
-    try {
-      return await speakWithPause(
-        message,
-        pauseMs,
-        generation,
-        ignoreGlobalCooldown || interrupt
-      );
-    } finally {
-      if (queuedMessages[0]?.id === queueEntry.id) {
-        queuedMessages = queuedMessages.slice(1);
-      } else {
-        removeQueuedMessageById(queueEntry.id);
-      }
-    }
-  });
-
-  return speechQueue;
+  options?: SpeakManagedOptions
+): Promise<boolean> {
+  return expoSpeechTTSGateway.speak(message, options);
 }
 
-export async function speakAndWait(
+export function speakAndWait(
   message: string,
-  options: SpeakManagedOptions = {}
-) {
-  await speakManagedText(message, options);
-  await waitForSpeechQueue();
+  options?: SpeakManagedOptions
+): Promise<void> {
+  return expoSpeechTTSGateway.speakAndWait(message, options);
 }
 
-export async function stopSpeaking() {
-  speechGeneration += 1;
-  const currentGen = speechGeneration;
-  queuedMessages = [];
-  isSpeaking = false;
-  
-  try {
-    const currentlySpeaking = await Speech.isSpeakingAsync();
-    if (currentlySpeaking) {
-      Speech.stop();
-    }
-  } catch (err) {
-    if (__DEV__) console.warn('[Speech] Error stopping speech', err);
-  }
-
-  // Overwrite the queue with a fresh start that respects the new generation
-  speechQueue = Promise.resolve(false);
-  lastSpeechFinishedAt = Date.now();
-  
-  // Return true if we successfully reached this point in the current generation
-  return currentGen === speechGeneration;
+export function stopSpeaking(): Promise<boolean> {
+  return expoSpeechTTSGateway.stop();
 }
+
 
 export function speakStationProximity(
   station: TransmilenioStation,

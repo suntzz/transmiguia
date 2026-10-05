@@ -8,32 +8,15 @@ import React, {
 } from 'react';
 
 import { DemoJourney, buildDemoJourney, logDemoEvent } from '@/src/services/demoService';
-import { LiveCoordinates } from '@/src/services/locationService';
 import { TransmilenioStation, getRandomStation } from '@/src/services/transmilenioService';
+import {
+  DemoState,
+  DemoStep,
+  ISimulationScenarioRunner,
+} from '@/src/domain/gateways/ISimulationGateway';
+import { simulationScenarioRunner } from '@/src/infrastructure/simulation/SimulationScenarioRunner';
 
-export type DemoStep =
-  | 'idle'
-  | 'voice'
-  | 'preview'
-  | 'walking'
-  | 'station_alert'
-  | 'station_arrival'
-  | 'boarding'
-  | 'in_bus'
-  | 'transfer'
-  | 'arrived';
-
-type DemoState = {
-  currentStep: DemoStep;
-  location: LiveCoordinates | null;
-  currentStationName: string | null;
-  nextStationName: string | null;
-  currentLegType: 'walk' | 'bus' | null;
-  busCode: string | null;
-  currentBusLegIndex: number;
-  hasArrived: boolean;
-  hasSpokenArrival: boolean;
-};
+export type { DemoStep, DemoState };
 
 type DemoModeContextValue = {
   demoModeEnabled: boolean;
@@ -42,6 +25,7 @@ type DemoModeContextValue = {
   demoRunId: number;
   demoJourney: DemoJourney | null;
   demoState: DemoState;
+  scenarioRunner: ISimulationScenarioRunner;
   setDemoModeEnabled: (value: boolean) => void;
   toggleDemoMode: () => void;
   startDemoPresentation: (transcript?: string) => void;
@@ -204,6 +188,7 @@ export function DemoModeProvider({ children }: PropsWithChildren) {
       demoRunId,
       demoJourney,
       demoState,
+      scenarioRunner: simulationScenarioRunner,
       setDemoModeEnabled,
       toggleDemoMode: () => setDemoModeEnabled((current) => !current),
       startDemoPresentation,

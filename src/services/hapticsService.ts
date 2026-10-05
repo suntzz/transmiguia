@@ -1,41 +1,41 @@
-import * as Haptics from 'expo-haptics';
+import { expoHapticsGateway } from '@/src/infrastructure/hardware/ExpoHapticsGateway';
 
 export function triggerSelectionHaptic() {
-  return Haptics.selectionAsync();
+  return expoHapticsGateway.triggerSelection();
 }
 
 export function triggerSoftImpactHaptic() {
-  return Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  return expoHapticsGateway.triggerSoftImpact();
 }
 
 export function triggerMediumImpactHaptic() {
-  return Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  return expoHapticsGateway.triggerMediumImpact();
 }
 
 export function triggerStrongImpactHaptic() {
-  return Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+  return expoHapticsGateway.triggerStrongImpact();
 }
 
 export function triggerSuccessHaptic() {
-  return Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  return expoHapticsGateway.triggerSuccess();
 }
 
 export function triggerWarningHaptic() {
-  return Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  return expoHapticsGateway.triggerWarning();
 }
 
 export function triggerInfoHaptic() {
-  return triggerSoftImpactHaptic();
+  return expoHapticsGateway.triggerInfo();
 }
 
 export function triggerTransferHaptic() {
-  return triggerMediumImpactHaptic();
+  return expoHapticsGateway.triggerTransfer();
 }
 
 export function triggerArrivalHaptic() {
-  return triggerStrongImpactHaptic();
+  return expoHapticsGateway.triggerArrival();
 }
 
 export function triggerErrorHaptic() {
-  return triggerWarningHaptic();
+  return expoHapticsGateway.triggerError();
 }

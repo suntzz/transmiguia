@@ -1,5 +1,9 @@
 import Constants from 'expo-constants';
 
+import { calculateDistanceBetweenCoordinates } from '@/src/core/geo/distance';
+
+export { calculateDistanceBetweenCoordinates };
+
 type Coordinates = {
   latitude: number;
   longitude: number;
@@ -264,27 +268,6 @@ function mapStepToInstruction(step: GoogleDirectionsStep): RouteStep | null {
       longitude: step.end_location.lng,
     },
   };
-}
-
-export function calculateDistanceBetweenCoordinates(
-  origin: Coordinates,
-  destination: Coordinates
-) {
-  const earthRadius = 6371000;
-  const latitudeDelta = ((destination.latitude - origin.latitude) * Math.PI) / 180;
-  const longitudeDelta = ((destination.longitude - origin.longitude) * Math.PI) / 180;
-  const originLatitude = (origin.latitude * Math.PI) / 180;
-  const destinationLatitude = (destination.latitude * Math.PI) / 180;
-
-  const haversine =
-    Math.sin(latitudeDelta / 2) * Math.sin(latitudeDelta / 2) +
-    Math.cos(originLatitude) *
-      Math.cos(destinationLatitude) *
-      Math.sin(longitudeDelta / 2) *
-      Math.sin(longitudeDelta / 2);
-
-  const arc = 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
-  return earthRadius * arc;
 }
 
 export function createFallbackWalkingRoute(
