@@ -5,15 +5,22 @@ import type {
 } from '@/src/domain/gateways/IPermissionsGateway';
 import { expoLocationGateway } from './ExpoLocationGateway';
 
-const MICROPHONE_PERMISSION = PermissionsAndroid.PERMISSIONS.RECORD_AUDIO;
-const LOCATION_PERMISSIONS = [
-  PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
-  PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-] as const;
+const MICROPHONE_PERMISSION =
+  Platform.OS === 'android' && PermissionsAndroid?.PERMISSIONS
+    ? PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+    : '';
+
+const LOCATION_PERMISSIONS =
+  Platform.OS === 'android' && PermissionsAndroid?.PERMISSIONS
+    ? [
+        PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      ]
+    : [];
 
 export class PermissionsGateway implements IPermissionsGateway {
   async checkAppPermissions(): Promise<AppPermissionsState> {
-    if (Platform.OS !== 'android') {
+    if (Platform.OS !== 'android' || !PermissionsAndroid) {
       return {
         microphone: true,
         location: true,
@@ -21,7 +28,9 @@ export class PermissionsGateway implements IPermissionsGateway {
       };
     }
 
-    const microphone = await PermissionsAndroid.check(MICROPHONE_PERMISSION);
+    const microphone = MICROPHONE_PERMISSION
+      ? await PermissionsAndroid.check(MICROPHONE_PERMISSION)
+      : true;
     const location = await expoLocationGateway.getPermissionStatus();
     const gpsEnabled = await expoLocationGateway.isServicesEnabled();
 
@@ -33,7 +42,7 @@ export class PermissionsGateway implements IPermissionsGateway {
   }
 
   async checkMicrophonePermission(): Promise<boolean> {
-    if (Platform.OS !== 'android') {
+    if (Platform.OS !== 'android' || !PermissionsAndroid || !MICROPHONE_PERMISSION) {
       return true;
     }
 
@@ -41,7 +50,7 @@ export class PermissionsGateway implements IPermissionsGateway {
   }
 
   async requestMicrophonePermission(): Promise<boolean> {
-    if (Platform.OS !== 'android') {
+    if (Platform.OS !== 'android' || !PermissionsAndroid || !MICROPHONE_PERMISSION) {
       return true;
     }
 
@@ -58,7 +67,7 @@ export class PermissionsGateway implements IPermissionsGateway {
   }
 
   async requestAppPermissions(): Promise<AppPermissionsState> {
-    if (Platform.OS !== 'android') {
+    if (Platform.OS !== 'android' || !PermissionsAndroid) {
       return {
         microphone: true,
         location: true,
