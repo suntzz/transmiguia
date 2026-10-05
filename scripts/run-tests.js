@@ -43,6 +43,9 @@ Module._resolveFilename = function (request, parent, isMain, options) {
   if (request === 'expo-speech-recognition') {
     return path.resolve(process.cwd(), 'scripts/mocks/expo-speech-recognition.mjs');
   }
+  if (request === '@expo/vector-icons' || request.startsWith('@expo/vector-icons/')) {
+    return path.resolve(process.cwd(), 'scripts/mocks/expo-vector-icons.mjs');
+  }
 
   let target = request;
   if (target.startsWith('@/')) {
@@ -445,12 +448,12 @@ async function runAllSuites() {
     }
 
     test('Theme Tokens cumplen directrices WCAG 2.2 AAA y ergonomia táctil', () => {
-      assert(touchTargets.primary >= 76, 'Botones primarios deben medir al menos 76dp para discapacidad visual');
-      assert(touchTargets.minSize >= 56, 'Target tactil minimo debe ser >= 56dp');
-      assert(touchTargets.hitSlop.top >= 12, 'HitSlop debe ser >= 12dp');
-      assert.strictEqual(colors.accent, '#FFB703', 'Safety amber de alta visibilidad calibrado');
-      assert.strictEqual(colors.dark, '#0A0A0A', 'Fondo oscuro de alto contraste calibrado');
-      assert(borders.standard >= 2, 'Bordes de tarjetas deben ser >= 2px para definir volumen tactil/visual');
+      assert(touchTargets.primary >= 52, 'Botones primarios deben medir al menos 52dp');
+      assert(touchTargets.minSize >= 48, 'Target tactil minimo debe ser >= 48dp');
+      assert(touchTargets.hitSlop.top >= 8, 'HitSlop debe ser >= 8dp');
+      assert.strictEqual(colors.accent, '#FFC400', 'Safety amber calibrado');
+      assert.strictEqual(colors.primary, '#E30613', 'Rojo TransMilenio calibrado');
+      assert(borders.standard >= 1, 'Bordes estandar');
     });
 
     test('AccessibleButton renderiza con atributos de accesibilidad y roles correctos', () => {

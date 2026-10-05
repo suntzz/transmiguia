@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { AccessibleButton } from '@/src/components/AccessibleButton';
 import { ScreenContainer } from '@/src/components/ScreenContainer';
@@ -14,12 +15,12 @@ import {
 import { useScreenAnnouncement } from '@/src/hooks/useScreenAnnouncement';
 import { useStopDemoOnBack } from '@/src/hooks/useStopDemoOnBack';
 import { RootStackParamList } from '@/src/utils/navigation';
-import { borders, colors, radius, spacing } from '@/src/utils/theme';
+import { colors, radius, shadows, spacing } from '@/src/utils/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RoutePreview'>;
 
 export function RoutePreviewScreen({ navigation }: Props) {
-  useScreenAnnouncement('Resumen de ruta. Confirma la navegacion antes de comenzar.');
+  useScreenAnnouncement('Resumen de ruta. Confirma la navegación antes de comenzar.');
   useStopDemoOnBack();
   const { destinationStation, setOriginStation } = useRouteSelection();
   const {
@@ -120,115 +121,232 @@ export function RoutePreviewScreen({ navigation }: Props) {
 
   return (
     <ScreenContainer showDemoBanner={false}>
-      <Text accessibilityRole="header" style={styles.title}>
-        Preparando ruta
-      </Text>
-      <View style={styles.card}>
-        <Text style={styles.label}>Destino</Text>
-        <Text style={styles.station}>{destinationStation.name}</Text>
-        <Text style={styles.helper}>
-          {demoJourney
-            ? `Salida simulada desde ${demoJourney.originStation.name}. La caminata ira solo hasta esa estacion.`
-            : 'La caminata ira solo hasta la estacion mas cercana.'}
-        </Text>
-        <Text style={styles.status}>{statusMessage}</Text>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text accessibilityRole="header" style={styles.title}>
+            Preparando ruta
+          </Text>
+          <Text style={styles.subtitle}>
+            Verificando estaciones y trayecto de navegación
+          </Text>
+        </View>
+
+        {/* Route Details Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.routePill}>
+              <MaterialIcons name="alt-route" size={16} color={colors.primary} />
+              <Text style={styles.label}>Destino</Text>
+            </View>
+            <View style={styles.statusPill}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>{statusMessage}</Text>
+            </View>
+          </View>
+
+          {/* Destination Focus Hero */}
+          <View style={styles.stationBlock}>
+            <Text style={styles.station}>{destinationStation.name}</Text>
+            <Text style={styles.helper}>
+              {demoJourney
+                ? `Salida simulada desde ${demoJourney.originStation.name}. La caminata irá hasta esa estación.`
+                : 'La caminata irá hacia la estación más cercana.'}
+            </Text>
+          </View>
+
+          {/* Timeline Nodes */}
+          <View style={styles.timeline}>
+            <View style={styles.timelineItem}>
+              <View style={styles.dotOrigin} />
+              <Text style={styles.timelineText}>
+                {demoJourney ? demoJourney.originStation.name : 'Estación de origen'}
+              </Text>
+            </View>
+            <View style={styles.timelineLine} />
+            <View style={styles.timelineItem}>
+              <View style={styles.dotDestination} />
+              <Text style={[styles.timelineText, styles.timelineDestinationText]}>
+                {destinationStation.name}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Action Controls */}
+        <View style={styles.actionGroup}>
+          <AccessibleButton
+            label="Cambiar destino"
+            variant="secondary"
+            icon={<MaterialIcons name="edit-location" size={20} color={colors.text} />}
+            hint="Abrir la lista de estaciones"
+            onPress={() => {
+              void stopSpeaking();
+              navigation.navigate('StationSelector');
+            }}
+          />
+
+          <AccessibleButton
+            label="Reiniciar demo"
+            variant="secondary"
+            icon={<MaterialIcons name="replay" size={20} color={colors.text} />}
+            hint="Reinicia la demostración desde el inicio"
+            onPress={() => {
+              if (advanceTimeoutRef.current) {
+                clearTimeout(advanceTimeoutRef.current);
+                advanceTimeoutRef.current = null;
+              }
+              void stopSpeaking();
+              restartDemoPresentation();
+              navigation.replace('VoicePrototype');
+            }}
+          />
+
+          <AccessibleButton
+            label="Detener demo"
+            variant="ghost"
+            icon={<MaterialIcons name="close" size={20} color={colors.primary} />}
+            hint="Detiene la demostración y vuelve al inicio"
+            onPress={() => {
+              if (advanceTimeoutRef.current) {
+                clearTimeout(advanceTimeoutRef.current);
+                advanceTimeoutRef.current = null;
+              }
+              void stopSpeaking();
+              stopDemoPresentation();
+              navigation.popToTop();
+            }}
+          />
+        </View>
       </View>
-      <AccessibleButton
-        label="Cambiar destino"
-        variant="secondary"
-        hint="Abrir la lista de estaciones"
-        onPress={() => {
-          if (__DEV__) {
-            console.log('[UI] Boton cambiar destino demo presionado');
-          }
-          void stopSpeaking();
-          navigation.navigate('StationSelector');
-        }}
-      />
-      <AccessibleButton
-        label="Reiniciar demo"
-        variant="secondary"
-        hint="Reinicia la demostracion desde el inicio"
-        onPress={() => {
-          if (__DEV__) {
-            console.log('[UI] Boton reiniciar demo presionado');
-          }
-          if (advanceTimeoutRef.current) {
-            clearTimeout(advanceTimeoutRef.current);
-            advanceTimeoutRef.current = null;
-          }
-          void stopSpeaking();
-          restartDemoPresentation();
-          navigation.replace('VoicePrototype');
-        }}
-      />
-      <AccessibleButton
-        label="Detener demo"
-        variant="secondary"
-        hint="Detiene la demostracion y vuelve al inicio"
-        onPress={() => {
-          if (__DEV__) {
-            console.log('[UI] Boton detener demo presionado');
-          }
-          if (advanceTimeoutRef.current) {
-            clearTimeout(advanceTimeoutRef.current);
-            advanceTimeoutRef.current = null;
-          }
-          void stopSpeaking();
-          stopDemoPresentation();
-          navigation.popToTop();
-        }}
-      />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    gap: spacing.md,
+  },
+  header: {
+    gap: 4,
+    paddingVertical: spacing.xs,
+  },
   title: {
-    fontSize: 30,
-    lineHeight: 38,
-    fontWeight: '900',
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '800',
     color: colors.text,
+  },
+  subtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.textSecondary,
   },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderWidth: borders.standard,
+    borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.xl,
-    gap: spacing.sm,
+    padding: spacing.md,
+    gap: spacing.md,
+    ...shadows.subtle,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  routePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primarySurface,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
   },
   label: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '900',
+    fontSize: 12,
+    fontWeight: '700',
     color: colors.primary,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.surfaceSubtle,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  stationBlock: {
+    gap: 4,
   },
   station: {
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: '900',
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '800',
     color: colors.text,
   },
   helper: {
-    fontSize: 17,
-    lineHeight: 24,
-    color: colors.textMuted,
-    fontWeight: '700',
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textSecondary,
   },
-  status: {
-    fontSize: 16,
-    lineHeight: 22,
-    color: colors.primary,
-    fontWeight: '800',
-    backgroundColor: colors.primarySurface,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    alignSelf: 'flex-start',
+  timeline: {
+    paddingTop: spacing.xs,
+    gap: 2,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  dotOrigin: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.primary,
+  },
+  dotDestination: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.accent,
+    borderWidth: 2,
+    borderColor: colors.dark,
+  },
+  timelineLine: {
+    width: 2,
+    height: 18,
+    backgroundColor: colors.borderSubtle,
+    marginLeft: 5,
+  },
+  timelineText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  timelineDestinationText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  actionGroup: {
+    gap: spacing.xs,
+    marginTop: spacing.xs,
   },
 });

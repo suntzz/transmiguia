@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { AccessibleButton } from '@/src/components/AccessibleButton';
@@ -16,7 +17,7 @@ import {
   stopSpeaking,
 } from '@/src/services/speechService';
 import { RootStackParamList } from '@/src/utils/navigation';
-import { borders, colors, radius, spacing } from '@/src/utils/theme';
+import { borders, colors, radius, shadows, spacing, typography } from '@/src/utils/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StationAlert'>;
 
@@ -84,16 +85,21 @@ export function StationAlertScreen({ navigation }: Props) {
 
   return (
     <ScreenContainer>
+      {/* Hero Proximity Card */}
       <View
         accessible={true}
         accessibilityRole="header"
         accessibilityLabel="Estación muy cerca. Sigue recto, la entrada principal está al frente."
-        style={styles.hero}>
-        <View style={styles.badgeRow}>
+        style={styles.heroCard}>
+        <View style={styles.topRow}>
+          <View style={styles.iconCircle}>
+            <MaterialIcons name="near-me" size={24} color={colors.primary} />
+          </View>
           <View style={styles.proximityBadge}>
             <Text style={styles.proximityBadgeText}>PROXIMIDAD</Text>
           </View>
         </View>
+
         <Text allowFontScaling={true} style={styles.title}>
           Estación cerca
         </Text>
@@ -102,74 +108,128 @@ export function StationAlertScreen({ navigation }: Props) {
         </Text>
       </View>
 
+      {/* TuLlave Turnstile Info Card */}
       <View
         accessible={true}
         accessibilityRole="text"
         accessibilityLabel="Indicación: Cuando llegues a la estación, ingresa por los torniquetes o paso accesible."
-        style={styles.alertCard}>
-        <Text allowFontScaling={true} style={styles.alertText}>
-          Al ingresar a la estación, pasa tu tarjeta TuLlave por el torniquete o puerta accesible.
-        </Text>
+        style={styles.infoCard}>
+        <View style={styles.infoIconWrapper}>
+          <MaterialIcons name="credit-card" size={24} color={colors.textSecondary} />
+        </View>
+        <View style={styles.infoContent}>
+          <Text allowFontScaling={true} style={styles.infoTitle}>
+            Ingreso con tarjeta
+          </Text>
+          <Text allowFontScaling={true} style={styles.alertText}>
+            Al ingresar a la estación, pasa tu tarjeta TuLlave por el torniquete o puerta accesible.
+          </Text>
+        </View>
       </View>
 
-      <AccessibleButton
-        label="Confirmar llegada a estación"
-        variant="accent"
-        hint="Toca para ingresar y esperar el bus"
-        accessibilityLabel="Confirmar llegada física a la estación"
-        onPress={() => navigation.replace('StationArrival')}
-      />
+      {/* Confirm Action Button */}
+      <View style={styles.actionContainer}>
+        <AccessibleButton
+          label="Confirmar llegada a estación"
+          variant="primary"
+          icon="check-circle"
+          hint="Toca para ingresar y esperar el bus"
+          accessibilityLabel="Confirmar llegada física a la estación"
+          onPress={() => navigation.replace('StationArrival')}
+        />
+      </View>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
+  heroCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
     padding: spacing.xl,
-    gap: spacing.sm,
     borderWidth: borders.standard,
-    borderColor: colors.primaryPressed,
+    borderColor: colors.border,
+    ...shadows.sm,
+    gap: spacing.sm,
   },
-  badgeRow: {
+  topRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.full,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   proximityBadge: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.accentLight,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xxs,
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.accent,
   },
   proximityBadgeText: {
     color: colors.accentText,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.8,
+    fontSize: typography.caption.fontSize,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   title: {
-    fontSize: 30,
-    lineHeight: 38,
-    fontWeight: '900',
-    color: colors.textInverse,
+    fontSize: typography.h2.fontSize,
+    fontWeight: typography.h2.fontWeight,
+    color: colors.text,
+    letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 18,
-    lineHeight: 26,
-    color: '#FFE4E6',
-    fontWeight: '700',
+    fontSize: typography.body.fontSize,
+    lineHeight: typography.body.lineHeight,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
-  alertCard: {
+  infoCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: borders.standard,
     borderColor: colors.border,
     padding: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    ...shadows.sm,
+  },
+  infoIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceHover,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  infoContent: {
+    flex: 1,
+    gap: spacing.xxs,
+  },
+  infoTitle: {
+    fontSize: typography.caption.fontSize,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   alertText: {
-    fontSize: 18,
-    lineHeight: 26,
+    fontSize: typography.body.fontSize,
+    lineHeight: typography.body.lineHeight,
     color: colors.text,
-    fontWeight: '700',
+    fontWeight: '600',
+  },
+  actionContainer: {
+    marginTop: spacing.sm,
   },
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { AccessibleButton } from '@/src/components/AccessibleButton';
 import { MapView } from '@/src/components/MapView';
@@ -9,7 +10,7 @@ import { useScreenAnnouncement } from '@/src/hooks/useScreenAnnouncement';
 import { triggerInfoHaptic } from '@/src/services/hapticsService';
 import { speakManagedText } from '@/src/services/speechService';
 import { RootStackParamList } from '@/src/utils/navigation';
-import { borders, colors, radius, spacing } from '@/src/utils/theme';
+import { colors, radius, shadows, spacing } from '@/src/utils/theme';
 import { useWalkingGuideController } from '@/src/presentation/features/walking-guide/useWalkingGuideController';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WalkingGuide'>;
@@ -59,7 +60,7 @@ export function WalkingGuideScreen({ navigation }: Props) {
         routeErrorMessage={routeError}
       />
 
-      {/* Tarjeta Primaria de Instrucción Peatonal */}
+      {/* Primary Pedestrian Instruction Card */}
       <View
         accessible={true}
         accessibilityRole="header"
@@ -67,39 +68,53 @@ export function WalkingGuideScreen({ navigation }: Props) {
         style={styles.primaryCard}>
         <View style={styles.badgeRow}>
           <View style={styles.phaseBadge}>
+            <MaterialIcons name="directions-walk" size={16} color={colors.primary} />
             <Text style={styles.phaseBadgeText}>GUÍA PEATONAL</Text>
           </View>
         </View>
-        <Text allowFontScaling={true} style={styles.primaryInstruction}>
-          {activeInstruction}
-        </Text>
+
+        <View style={styles.instructionRow}>
+          <View style={styles.directionIconCircle}>
+            <MaterialIcons name="straight" size={24} color={colors.primary} />
+          </View>
+          <Text allowFontScaling={true} style={styles.primaryInstruction}>
+            {activeInstruction}
+          </Text>
+        </View>
       </View>
 
-      {/* Tarjeta Secundaria de Estado y Distancia */}
+      {/* Secondary Status & Distance Card */}
       <View
         accessible={true}
         accessibilityRole="text"
         accessibilityLabel={`Estado de la caminata: ${statusText}. ${supportText ?? ''}`}
         style={styles.secondaryCard}>
-        <Text allowFontScaling={true} style={styles.secondaryText}>
-          {statusText}
-        </Text>
-        {demoSupportText ? (
-          <Text allowFontScaling={true} style={styles.supportText}>
-            {demoSupportText}
-          </Text>
-        ) : null}
-        {supportText ? (
-          <Text allowFontScaling={true} style={styles.supportText}>
-            {supportText}
-          </Text>
-        ) : null}
+        <View style={styles.statusRow}>
+          <MaterialIcons name="navigation" size={20} color={colors.primary} />
+          <View style={styles.statusInfo}>
+            <Text allowFontScaling={true} style={styles.secondaryText}>
+              {statusText}
+            </Text>
+            {demoSupportText ? (
+              <Text allowFontScaling={true} style={styles.supportText}>
+                {demoSupportText}
+              </Text>
+            ) : null}
+            {supportText ? (
+              <Text allowFontScaling={true} style={styles.supportText}>
+                {supportText}
+              </Text>
+            ) : null}
+          </View>
+        </View>
       </View>
 
-      {/* Botón para Repetir Indicación por Voz (Vital para ciegos) */}
+      {/* Repeat Voice Feedback Button (Essential for visual impairment) */}
       <AccessibleButton
         label="Repetir indicación por voz"
         variant="accent"
+        size="large"
+        icon={<MaterialIcons name="volume-up" size={22} color={colors.accentText} />}
         hint="Vuelve a escuchar la última instrucción de orientación"
         accessibilityLabel="Repetir indicación de caminata por voz"
         onPress={handleRepeatVoice}
@@ -108,6 +123,7 @@ export function WalkingGuideScreen({ navigation }: Props) {
       <AccessibleButton
         label="Cambiar destino"
         variant="secondary"
+        icon={<MaterialIcons name="edit-location" size={20} color={colors.text} />}
         hint="Abrir la lista de estaciones"
         accessibilityLabel="Cambiar destino de la caminata"
         onPress={() => navigation.navigate('StationSelector')}
@@ -120,51 +136,77 @@ const styles = StyleSheet.create({
   primaryCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderWidth: borders.standard,
+    borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.lg,
+    padding: spacing.md,
     gap: spacing.sm,
+    ...shadows.subtle,
   },
   badgeRow: {
     flexDirection: 'row',
   },
   phaseBadge: {
-    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primarySurface,
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xxs,
+    paddingVertical: 4,
     borderRadius: radius.sm,
   },
   phaseBadgeText: {
-    color: colors.textInverse,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.6,
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  instructionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  directionIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primarySurface,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   primaryInstruction: {
-    fontSize: 28,
-    lineHeight: 36,
-    fontWeight: '900',
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: '700',
     color: colors.text,
+    flex: 1,
   },
+
   secondaryCard: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderWidth: borders.standard,
+    borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.xs,
+    padding: spacing.md,
+    ...shadows.subtle,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  statusInfo: {
+    flex: 1,
+    gap: 2,
   },
   secondaryText: {
-    fontSize: 18,
-    lineHeight: 26,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '600',
     color: colors.text,
-    fontWeight: '800',
   },
   supportText: {
-    fontSize: 16,
-    lineHeight: 22,
-    color: colors.textMuted,
-    fontWeight: '700',
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textSecondary,
   },
 });

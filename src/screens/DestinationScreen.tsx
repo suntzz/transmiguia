@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { CommonActions } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StyleSheet, Text, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { AccessibleButton } from '@/src/components/AccessibleButton';
 import { ScreenContainer } from '@/src/components/ScreenContainer';
@@ -16,7 +17,7 @@ import {
 } from '@/src/services/speechService';
 import { countStationsBetween } from '@/src/services/transmilenioService';
 import { RootStackParamList } from '@/src/utils/navigation';
-import { borders, colors, radius, spacing } from '@/src/utils/theme';
+import { borders, colors, radius, shadows, spacing, typography } from '@/src/utils/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Destination'>;
 
@@ -66,6 +67,7 @@ export function DestinationScreen({ navigation, route }: Props) {
 
   return (
     <ScreenContainer>
+      {/* Celebration Hero */}
       <View
         accessible={true}
         accessibilityRole="header"
@@ -74,53 +76,81 @@ export function DestinationScreen({ navigation, route }: Props) {
         <View style={styles.checkCircle}>
           <Text style={styles.checkIcon}>✓</Text>
         </View>
+
         <Text allowFontScaling={true} style={styles.title}>
           ¡Llegaste a tu destino!
         </Text>
+
+        {/* Destination Card */}
         <View style={styles.destinationCard}>
-          <Text style={styles.destinationLabel}>ESTACIÓN FINAL</Text>
-          <Text allowFontScaling={true} style={styles.destinationName}>
-            {destinationStation.name}
-          </Text>
+          <View style={styles.badgeRow}>
+            <View style={styles.destBadge}>
+              <Text style={styles.destinationLabel}>ESTACIÓN FINAL</Text>
+            </View>
+          </View>
+          <View style={styles.destContentRow}>
+            <MaterialIcons name="place" size={24} color={colors.primary} />
+            <Text allowFontScaling={true} style={styles.destinationName}>
+              {destinationStation.name}
+            </Text>
+          </View>
         </View>
       </View>
 
+      {/* Trip Summary Card */}
       <View
         accessible={true}
         accessibilityRole="text"
         accessibilityLabel={`Resumen del viaje: Abordaste en ${originStation?.name ?? 'la estación de origen'}. Cantidad de paradas: ${stopCount ?? 'completado'}.`}
         style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Resumen del Viaje</Text>
+        <View style={styles.summaryHeader}>
+          <MaterialIcons name="receipt-long" size={20} color={colors.textSecondary} />
+          <Text style={styles.summaryTitle}>Resumen del Viaje</Text>
+        </View>
+
+        <View style={styles.divider} />
+
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Origen:</Text>
+          <View style={styles.summaryLabelGroup}>
+            <MaterialIcons name="trip-origin" size={16} color={colors.textSecondary} />
+            <Text style={styles.summaryLabel}>Origen:</Text>
+          </View>
           <Text allowFontScaling={true} style={styles.summaryValue}>
             {originStation?.name ?? 'Estación de origen'}
           </Text>
         </View>
+
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Paradas recorridas:</Text>
+          <View style={styles.summaryLabelGroup}>
+            <MaterialIcons name="alt-route" size={16} color={colors.textSecondary} />
+            <Text style={styles.summaryLabel}>Paradas recorridas:</Text>
+          </View>
           <Text allowFontScaling={true} style={styles.summaryValue}>
             {stopCount != null ? `${stopCount} estaciones` : 'Recorrido finalizado'}
           </Text>
         </View>
       </View>
 
-      <AccessibleButton
-        label="Comenzar un nuevo viaje"
-        subtitle="Regresar a la pantalla de inicio"
-        variant="primary"
-        hint="Toca para reiniciar el flujo y planear otro recorrido"
-        accessibilityLabel="Comenzar un nuevo viaje. Regresa al inicio."
-        onPress={() => {
-          resetTrip();
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: 'Home' }],
-            })
-          );
-        }}
-      />
+      {/* Primary Action Button */}
+      <View style={styles.actionContainer}>
+        <AccessibleButton
+          label="Comenzar un nuevo viaje"
+          subtitle="Regresar a la pantalla de inicio"
+          variant="primary"
+          icon="refresh"
+          hint="Toca para reiniciar el flujo y planear otro recorrido"
+          accessibilityLabel="Comenzar un nuevo viaje. Regresa al inicio."
+          onPress={() => {
+            resetTrip();
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'Home' }],
+              })
+            );
+          }}
+        />
+      </View>
     </ScreenContainer>
   );
 }
@@ -128,53 +158,69 @@ export function DestinationScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   hero: {
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
   },
   checkCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.success,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 2,
+    borderColor: colors.success,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: borders.heavy,
-    borderColor: colors.border,
+    ...shadows.sm,
   },
   checkIcon: {
-    fontSize: 40,
-    fontWeight: '900',
-    color: colors.textInverse,
-    lineHeight: 46,
-  },
-  title: {
-    fontSize: 30,
-    lineHeight: 38,
-    fontWeight: '900',
-    color: colors.text,
-    textAlign: 'center',
-  },
-  destinationCard: {
-    backgroundColor: colors.successSoft,
-    borderWidth: borders.bold,
-    borderColor: colors.success,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    gap: 4,
-    width: '100%',
-  },
-  destinationLabel: {
-    fontSize: 12,
+    fontSize: 36,
     fontWeight: '900',
     color: colors.success,
-    letterSpacing: 1,
+    lineHeight: 40,
+  },
+  title: {
+    fontSize: typography.h1.fontSize,
+    fontWeight: typography.h1.fontWeight,
+    color: colors.text,
+    textAlign: 'center',
+    letterSpacing: -0.4,
+  },
+  destinationCard: {
+    backgroundColor: colors.surface,
+    borderWidth: borders.standard,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.xs,
+    width: '100%',
+    ...shadows.sm,
+  },
+  badgeRow: {
+    marginBottom: 2,
+  },
+  destBadge: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  destinationLabel: {
+    fontSize: typography.caption.fontSize,
+    fontWeight: '800',
+    color: '#065F46',
+    letterSpacing: 0.8,
+  },
+  destContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   destinationName: {
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: '900',
+    fontSize: typography.h2.fontSize,
+    fontWeight: typography.h2.fontWeight,
     color: colors.text,
     textAlign: 'center',
   },
@@ -185,14 +231,22 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.lg,
     gap: spacing.sm,
+    ...shadows.sm,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   summaryTitle: {
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: typography.h3.fontSize,
+    fontWeight: typography.h3.fontWeight,
     color: colors.text,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceMuted,
-    paddingBottom: spacing.xs,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.xxs,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -200,14 +254,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.xxs,
   },
+  summaryLabelGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   summaryLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textMuted,
+    fontSize: typography.body.fontSize,
+    fontWeight: '500',
+    color: colors.textSecondary,
   },
   summaryValue: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: typography.body.fontSize,
+    fontWeight: '700',
     color: colors.text,
+  },
+  actionContainer: {
+    marginTop: spacing.xs,
   },
 });

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { AccessibleButton } from '@/src/components/AccessibleButton';
@@ -42,7 +43,7 @@ import {
 import { useScreenAnnouncement } from '@/src/hooks/useScreenAnnouncement';
 import { useStopDemoOnBack } from '@/src/hooks/useStopDemoOnBack';
 import { RootStackParamList } from '@/src/utils/navigation';
-import { borders, colors, radius, spacing } from '@/src/utils/theme';
+import { borders, colors, radius, shadows, spacing, typography } from '@/src/utils/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'VoicePrototype'>;
 
@@ -57,15 +58,15 @@ function getStationResolutionMessage(
       .join(' o ');
 
     return suggestions
-      ? `No quedo claro si dijiste ${suggestions}. Di el nombre completo o escribelo manualmente.`
-      : 'No quedo clara la estacion. Di el nombre completo o escribelo manualmente.';
+      ? `No quedó claro si dijiste ${suggestions}. Di el nombre completo o escríbelo manualmente.`
+      : 'No quedó clara la estación. Di el nombre completo o escríbelo manualmente.';
   }
 
   if (transcript.trim()) {
-    return 'No se reconocio una estacion valida. Intenta decir el nombre exacto o escribelo manualmente.';
+    return 'No se reconoció una estación válida. Intenta decir el nombre exacto o escríbelo manualmente.';
   }
 
-  return 'No se detecto una estacion valida. Intenta de nuevo o escribe el destino manualmente.';
+  return 'No se detectó una estación válida. Intenta de nuevo o escribe el destino manualmente.';
 }
 
 export function VoicePrototypeScreen({ navigation }: Props) {
@@ -96,7 +97,7 @@ export function VoicePrototypeScreen({ navigation }: Props) {
   const [suggestedStations, setSuggestedStations] = useState<TransmilenioStation[]>([]);
 
   useScreenAnnouncement(
-    'Destino por voz. Puedes decir una estacion de TransMilenio.'
+    'Destino por voz. Puedes decir una estación de TransMilenio.'
   );
   useStopDemoOnBack();
 
@@ -162,7 +163,7 @@ export function VoicePrototypeScreen({ navigation }: Props) {
       const journey = prepareDemoJourney(station);
 
       if (!journey) {
-        setVoiceError('No pude preparar la demostracion con ese destino.');
+        setVoiceError('No pude preparar la demostración con ese destino.');
         isHandlingDestinationRef.current = false;
         await triggerWarningHaptic();
         await speakVoiceError();
@@ -230,7 +231,7 @@ export function VoicePrototypeScreen({ navigation }: Props) {
     if (!match.station) {
       const message =
         match.reason === 'empty'
-          ? 'No te escuche bien, intenta otra vez.'
+          ? 'No te escuché bien, intenta otra vez.'
           : getStationResolutionMessage(nextText, match);
       setVoiceError(message);
       setSuggestedStations(match.candidates?.slice(0, 3) ?? []);
@@ -252,7 +253,7 @@ export function VoicePrototypeScreen({ navigation }: Props) {
     const availability = resolveStationAvailability(match.station);
 
     if (!availability) {
-      const message = 'No fue posible validar la disponibilidad de esa estacion.';
+      const message = 'No fue posible validar la disponibilidad de esa estación.';
       setVoiceError(message);
       setIsResolvingDestination(false);
       isHandlingDestinationRef.current = false;
@@ -319,7 +320,7 @@ export function VoicePrototypeScreen({ navigation }: Props) {
             !latestTranscriptRef.current.trim() &&
             !lastVoiceErrorRef.current
           ) {
-            const message = 'No te escuche bien, intenta otra vez.';
+            const message = 'No te escuché bien, intenta otra vez.';
             setVoiceError(message);
             void triggerWarningHaptic();
             void speakVoiceError();
@@ -431,7 +432,7 @@ export function VoicePrototypeScreen({ navigation }: Props) {
       setPartialTranscript('');
       setManualInput('');
       await triggerMediumImpactHaptic();
-      await speakAndWait('A donde quieres ir?', {
+      await speakAndWait('¿A dónde quieres ir?', {
         key: 'demo-voice-question',
         minIntervalMs: 0,
         interrupt: true,
@@ -482,38 +483,71 @@ export function VoicePrototypeScreen({ navigation }: Props) {
   ]);
 
   const liveTranscript = partialTranscript || transcript;
-  
+
   // During demo, don't show the previous destination while the prompt is active
   const showStaleDestination = demoAutoFlowEnabled && !transcript && isListening;
   const currentDestinationLabel = pendingStation
     ? `Confirmar ${pendingStation.name}`
-    : (hasSelectedDestination && !showStaleDestination)
+    : hasSelectedDestination && !showStaleDestination
       ? destinationStation.name
-      : isResolvingDestination 
+      : isResolvingDestination
         ? 'Procesando...'
-        : 'Aun sin destino confirmado';
+        : 'Aún sin destino confirmado';
 
   return (
     <ScreenContainer>
-      <View style={styles.iconWrap}>
-        <Text style={styles.icon}>🎙️</Text>
-      </View>
-      <Text accessibilityRole="header" style={styles.title}>
-        Decir destino por voz
-      </Text>
-      <Text style={styles.subtitle}>
-        Di una estacion o escribela si lo prefieres.
-      </Text>
-      <View style={[styles.liveCard, isListening && styles.transcriptCardActive]}>
-        <Text style={styles.liveLabel}>
-          {isListening ? 'Escuchando...' : transcript ? 'Te escuche decir' : 'Di tu destino'}
+      {/* Header and Mic Visual Indicator */}
+      <View style={styles.header}>
+        <View style={[styles.micIconCircle, isListening && styles.micIconCircleActive]}>
+          <MaterialIcons
+            name={isListening ? 'graphic-eq' : 'mic'}
+            size={36}
+            color={isListening ? colors.primary : colors.textSecondary}
+          />
+        </View>
+        <Text accessibilityRole="header" style={styles.title}>
+          Decir destino por voz
         </Text>
+        <Text style={styles.subtitle}>
+          Di una estación o escríbela si lo prefieres.
+        </Text>
+      </View>
+
+      {/* Live Voice Assistant Card */}
+      <View
+        accessible={true}
+        accessibilityRole="summary"
+        accessibilityLabel={
+          isListening
+            ? `Escuchando tu voz. Texto detectado: ${liveTranscript || 'habla ahora'}`
+            : `Voz inactiva. Último texto: ${liveTranscript || 'sin grabación'}`
+        }
+        style={[styles.liveCard, isListening && styles.liveCardActive]}>
+        <View style={styles.liveCardTop}>
+          <View style={styles.liveStatusRow}>
+            {isListening ? <View style={styles.recordingDot} /> : null}
+            <Text style={[styles.liveLabel, isListening && styles.liveLabelActive]}>
+              {isListening ? 'Escuchando...' : transcript ? 'Te escuché decir' : 'Di tu destino'}
+            </Text>
+          </View>
+          {isListening ? (
+            <View style={styles.liveBadge}>
+              <Text style={styles.liveBadgeText}>Micrófono activo</Text>
+            </View>
+          ) : null}
+        </View>
+
         <Text style={[styles.liveText, !liveTranscript && styles.transcriptPlaceholder]}>
-          {liveTranscript || 'A donde quieres ir?'}
+          {liveTranscript || '¿A dónde quieres ir?'}
         </Text>
-        {isListening ? <Text style={styles.liveBadge}>Microfono activo</Text> : null}
       </View>
-      <View style={styles.transcriptCard}>
+
+      {/* Final Recognized Transcript */}
+      <View
+        accessible={true}
+        accessibilityRole="text"
+        accessibilityLabel={`Resultado final reconocido: ${transcript || 'esperando resultado'}`}
+        style={styles.transcriptCard}>
         <Text style={styles.transcriptLabel}>Resultado final</Text>
         <Text
           style={[
@@ -523,27 +557,87 @@ export function VoicePrototypeScreen({ navigation }: Props) {
           {transcript || 'Esperando resultado final.'}
         </Text>
       </View>
+
+      {/* Voice Action Hero Button */}
+      <AccessibleButton
+        label={isListening ? 'Detener escucha' : 'Escuchar destino'}
+        icon={isListening ? 'stop' : 'mic'}
+        variant={isListening ? 'danger' : 'primary'}
+        hint="Activa o detiene el reconocimiento de voz"
+        accessibilityLabel={
+          isListening
+            ? 'Detener reconocimiento de voz del destino'
+            : 'Iniciar reconocimiento de voz del destino'
+        }
+        onPress={() => {
+          if (isListening) {
+            void stopVoiceRecognition();
+            setIsListening(false);
+            return;
+          }
+
+          void handleStartListening();
+        }}
+      />
+
+      {/* Current Destination Status Card */}
       <View style={styles.statusCard}>
-        <Text style={styles.statusLabel}>Destino actual</Text>
+        <View style={styles.statusHeader}>
+          <MaterialIcons name="place" size={18} color={colors.primary} />
+          <Text style={styles.statusLabel}>Destino actual</Text>
+        </View>
         <Text style={styles.statusValue}>{currentDestinationLabel}</Text>
-        {isListening ? <Text style={styles.listeningText}>Escuchando...</Text> : null}
+
+        {isListening ? (
+          <View style={styles.statusHelperRow}>
+            <MaterialIcons name="record-voice-over" size={16} color={colors.primary} />
+            <Text style={styles.listeningText}>Escuchando...</Text>
+          </View>
+        ) : null}
+
         {isResolvingDestination ? (
-          <Text style={styles.listeningText}>Preparando el recorrido...</Text>
+          <View style={styles.statusHelperRow}>
+            <MaterialIcons name="sync" size={16} color={colors.primary} />
+            <Text style={styles.listeningText}>Preparando el recorrido...</Text>
+          </View>
         ) : null}
+
         {voiceAvailable === false && !demoAutoFlowEnabled ? (
-          <Text style={styles.warningText}>
-            No hay motor de voz disponible. Usa el campo manual.
-          </Text>
+          <View style={styles.alertNotice}>
+            <MaterialIcons name="warning" size={16} color={colors.warning} />
+            <Text style={styles.warningText}>
+              No hay motor de voz disponible. Usa el campo manual.
+            </Text>
+          </View>
         ) : null}
-        {selectionMessage ? <Text style={styles.warningText}>{selectionMessage}</Text> : null}
-        {voiceError ? <Text style={styles.errorText}>{voiceError}</Text> : null}
+
+        {selectionMessage ? (
+          <View style={styles.alertNotice}>
+            <MaterialIcons name="info" size={16} color={colors.info} />
+            <Text style={styles.infoNoticeText}>{selectionMessage}</Text>
+          </View>
+        ) : null}
+
+        {voiceError ? (
+          <View style={styles.alertNoticeError}>
+            <MaterialIcons name="error-outline" size={16} color={colors.error} />
+            <Text style={styles.errorText}>{voiceError}</Text>
+          </View>
+        ) : null}
       </View>
+
+      {/* Pending Confirmation Modal / Card */}
       {pendingStation ? (
         <View style={styles.confirmationCard}>
-          <Text style={styles.confirmationLabel}>Confirmar destino</Text>
+          <View style={styles.confirmationHeader}>
+            <MaterialIcons name="check-circle" size={22} color={colors.success} />
+            <Text style={styles.confirmationLabel}>Confirmar destino</Text>
+          </View>
           <Text style={styles.confirmationValue}>{pendingStation.name}</Text>
           <AccessibleButton
             label="Confirmar destino"
+            icon="check"
+            variant="primary"
             hint="Aceptar este destino y continuar"
             onPress={() => {
               void confirmDestinationSelection(pendingStation, {
@@ -555,6 +649,7 @@ export function VoicePrototypeScreen({ navigation }: Props) {
           <AccessibleButton
             label="Escuchar otra vez"
             variant="secondary"
+            icon="replay"
             hint="Volver a escuchar o decir otro destino"
             onPress={() => {
               clearVoiceResolutionState();
@@ -566,65 +661,43 @@ export function VoicePrototypeScreen({ navigation }: Props) {
           />
         </View>
       ) : null}
+
+      {/* Suggested Options */}
       {!pendingStation && suggestedStations.length > 0 ? (
-        <View style={styles.confirmationCard}>
-          <Text style={styles.confirmationLabel}>Opciones cercanas</Text>
-          {suggestedStations.slice(0, 3).map((station) => (
-            <AccessibleButton
-              key={station.id}
-              label={station.name}
-              variant="secondary"
-              hint="Usar esta estacion como destino"
-              onPress={() => {
-                if (__DEV__) {
-                  console.log('[UI] Opcion sugerida presionada', {
-                    station: station.name,
-                    demoModeEnabled,
-                    demoAutoFlowEnabled,
+        <View style={styles.suggestionsCard}>
+          <Text style={styles.suggestionsTitle}>Opciones cercanas</Text>
+          <View style={styles.suggestionsList}>
+            {suggestedStations.slice(0, 3).map((station) => (
+              <AccessibleButton
+                key={station.id}
+                label={station.name}
+                variant="secondary"
+                icon="place"
+                hint="Usar esta estación como destino"
+                onPress={() => {
+                  void confirmDestinationSelection(station, {
+                    autoContinue: demoModeEnabled,
                   });
-                }
-                void confirmDestinationSelection(station, {
-                  autoContinue: demoModeEnabled,
-                });
-              }}
-            />
-          ))}
+                }}
+              />
+            ))}
+          </View>
         </View>
       ) : null}
-      <AccessibleButton
-        label={isListening ? 'Detener escucha' : 'Escuchar destino'}
-        hint="Activa o detiene el reconocimiento de voz"
-        accessibilityLabel={
-          isListening
-            ? 'Detener reconocimiento de voz del destino'
-            : 'Iniciar reconocimiento de voz del destino'
-        }
-        onPress={() => {
-          if (__DEV__) {
-            console.log('[UI] Boton voz presionado', {
-              isListening,
-              demoModeEnabled,
-              demoAutoFlowEnabled,
-            });
-          }
-          if (isListening) {
-            void stopVoiceRecognition();
-            setIsListening(false);
-            return;
-          }
 
-          void handleStartListening();
-        }}
-      />
+      {/* Manual Fallback Input Card */}
       <View style={styles.manualCard}>
-        <Text style={styles.manualLabel}>Escribir destino manualmente</Text>
+        <View style={styles.manualHeader}>
+          <MaterialIcons name="keyboard" size={20} color={colors.textSecondary} />
+          <Text style={styles.manualLabel}>Escribir destino manualmente</Text>
+        </View>
         <TextInput
           accessibilityLabel="Campo para escribir la estación destino"
           accessibilityHint="Escribe una estación y luego activa el botón usar texto escrito"
           autoCapitalize="words"
           autoCorrect={false}
           onChangeText={setManualInput}
-          placeholder="Escribe una estacion"
+          placeholder="Escribe una estación"
           placeholderTextColor={colors.textSoft}
           style={styles.input}
           value={manualInput}
@@ -632,99 +705,155 @@ export function VoicePrototypeScreen({ navigation }: Props) {
         <AccessibleButton
           label="Usar texto escrito"
           variant="secondary"
+          icon="check"
           hint="Convierte el texto escrito en una estación válida"
           accessibilityLabel="Usar texto escrito como destino"
           onPress={() => {
-            if (__DEV__) {
-              console.log('[UI] Boton usar texto presionado', {
-                manualInput,
-                demoModeEnabled,
-                demoAutoFlowEnabled,
-              });
-            }
             void handleManualApply();
           }}
         />
       </View>
-      <AccessibleButton
-        label="Cambiar destino"
-        variant="secondary"
-        hint="Abrir lista de estaciones disponibles"
-        accessibilityLabel="Cambiar destino manualmente"
-        onPress={() => {
-          if (__DEV__) {
-            console.log('[UI] Boton cambiar destino presionado', {
-              demoModeEnabled,
-              demoAutoFlowEnabled,
-            });
-          }
-          navigation.navigate('StationSelector');
-        }}
-      />
-      <AccessibleButton
-        label="Continuar con destino detectado"
-        hint="Abre el resumen de ruta"
-        disabled={!hasSelectedDestination || isResolvingDestination || Boolean(pendingStation)}
-        onPress={() => {
-          if (__DEV__) {
-            console.log('[UI] Boton continuar presionado', {
-              hasSelectedDestination,
-              isResolvingDestination,
-              hasPendingStation: Boolean(pendingStation),
-              demoModeEnabled,
-              demoAutoFlowEnabled,
-            });
-          }
-          if (!hasSelectedDestination) {
-            void speakManagedText(
-              'Primero di o escribe un destino para iniciar la guia.',
-              {
-                key: 'voice-missing-destination',
-                minIntervalMs: 0,
-                interrupt: true,
-              }
-            );
-            return;
-          }
 
-          if (demoModeEnabled) {
-            void continueDemoFlow();
-            return;
-          }
+      {/* Navigation and Next Actions */}
+      <View style={styles.footerActions}>
+        <AccessibleButton
+          label="Continuar con destino detectado"
+          icon="arrow-forward"
+          variant="primary"
+          hint="Abre el resumen de ruta"
+          disabled={!hasSelectedDestination || isResolvingDestination || Boolean(pendingStation)}
+          onPress={() => {
+            if (!hasSelectedDestination) {
+              void speakManagedText(
+                'Primero di o escribe un destino para iniciar la guía.',
+                {
+                  key: 'voice-missing-destination',
+                  minIntervalMs: 0,
+                  interrupt: true,
+                }
+              );
+              return;
+            }
 
-          navigation.navigate('RoutePreview');
-        }}
-      />
+            if (demoModeEnabled) {
+              void continueDemoFlow();
+              return;
+            }
+
+            navigation.navigate('RoutePreview');
+          }}
+        />
+
+        <AccessibleButton
+          label="Cambiar destino"
+          variant="secondary"
+          icon="list"
+          hint="Abrir lista de estaciones disponibles"
+          accessibilityLabel="Cambiar destino manualmente"
+          onPress={() => {
+            navigation.navigate('StationSelector');
+          }}
+        />
+      </View>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  iconWrap: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.surface,
+  header: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+  },
+  micIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.surfaceHover,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    alignSelf: 'center',
+    marginBottom: spacing.xs,
   },
-  icon: {
-    fontSize: 48,
+  micIconCircleActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
   },
   title: {
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: '800',
+    fontSize: typography.h2.fontSize,
+    fontWeight: typography.h2.fontWeight,
     color: colors.text,
     textAlign: 'center',
+    letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: colors.textMuted,
+    fontSize: typography.body.fontSize,
+    lineHeight: typography.body.lineHeight,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  liveCard: {
+    minHeight: 140,
+    backgroundColor: colors.surface,
+    borderWidth: borders.standard,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    ...shadows.sm,
+  },
+  liveCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: '#FFF5F5',
+  },
+  liveCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  liveStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  recordingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+  },
+  liveLabel: {
+    fontSize: typography.caption.fontSize,
+    fontWeight: '800',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  liveLabelActive: {
+    color: colors.primary,
+  },
+  liveBadge: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  liveBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: 0.4,
+  },
+  liveText: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: '800',
+    color: colors.text,
     textAlign: 'center',
   },
   transcriptCard: {
@@ -732,74 +861,26 @@ const styles = StyleSheet.create({
     borderWidth: borders.standard,
     borderColor: colors.border,
     borderRadius: radius.md,
-    padding: spacing.lg,
-    gap: spacing.xs,
-  },
-  transcriptCardActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentSurface,
-    borderWidth: borders.bold,
-  },
-  liveCard: {
-    minHeight: 180,
-    backgroundColor: colors.surface,
-    borderWidth: borders.standard,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-  },
-  liveLabel: {
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '900',
-    color: colors.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  liveText: {
-    fontSize: 32,
-    lineHeight: 40,
-    fontWeight: '900',
-    color: colors.text,
-    textAlign: 'center',
-  },
-  transcriptHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
+    padding: spacing.md,
+    gap: spacing.xxs,
+    ...shadows.sm,
   },
   transcriptLabel: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.textMuted,
+    fontSize: typography.caption.fontSize,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   transcriptText: {
-    fontSize: 22,
-    lineHeight: 30,
-    fontWeight: '800',
+    fontSize: typography.body.fontSize,
+    lineHeight: typography.body.lineHeight,
+    fontWeight: '700',
     color: colors.text,
   },
   transcriptPlaceholder: {
     color: colors.textSoft,
-    fontWeight: '600',
-  },
-  liveBadge: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '900',
-    color: colors.accentText,
-    backgroundColor: colors.accent,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
+    fontWeight: '500',
   },
   statusCard: {
     backgroundColor: colors.surface,
@@ -808,56 +889,116 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.lg,
     gap: spacing.xs,
+    ...shadows.sm,
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  statusLabel: {
+    fontSize: typography.caption.fontSize,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statusValue: {
+    fontSize: typography.h3.fontSize,
+    fontWeight: typography.h3.fontWeight,
+    color: colors.text,
+  },
+  statusHelperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.xxs,
+  },
+  listeningText: {
+    fontSize: typography.bodySecondary.fontSize,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  alertNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: '#FFFBEB',
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    marginTop: spacing.xxs,
+  },
+  alertNoticeError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: '#FEF2F2',
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    marginTop: spacing.xxs,
+  },
+  warningText: {
+    fontSize: typography.bodySecondary.fontSize,
+    color: '#92400E',
+    fontWeight: '600',
+    flex: 1,
+  },
+  infoNoticeText: {
+    fontSize: typography.bodySecondary.fontSize,
+    color: '#1E40AF',
+    fontWeight: '600',
+    flex: 1,
+  },
+  errorText: {
+    fontSize: typography.bodySecondary.fontSize,
+    color: colors.error,
+    fontWeight: '600',
+    flex: 1,
   },
   confirmationCard: {
-    backgroundColor: colors.successSoft,
-    borderWidth: borders.bold,
-    borderColor: colors.success,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
     borderRadius: radius.md,
     padding: spacing.lg,
     gap: spacing.md,
   },
+  confirmationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   confirmationLabel: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: colors.success,
+    fontSize: typography.caption.fontSize,
+    fontWeight: '800',
+    color: '#065F46',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
   },
   confirmationValue: {
-    fontSize: 26,
-    lineHeight: 34,
+    fontSize: typography.h2.fontSize,
+    lineHeight: typography.h2.lineHeight,
     fontWeight: '900',
-    color: colors.text,
+    color: '#065F46',
   },
-  statusLabel: {
-    fontSize: 14,
+  suggestionsCard: {
+    backgroundColor: colors.surface,
+    borderWidth: borders.standard,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    ...shadows.sm,
+  },
+  suggestionsTitle: {
+    fontSize: typography.caption.fontSize,
     fontWeight: '800',
-    color: colors.textMuted,
+    color: colors.textSecondary,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  statusValue: {
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: '900',
-    color: colors.text,
-  },
-  listeningText: {
-    fontSize: 16,
-    color: colors.primary,
-    fontWeight: '800',
-  },
-  warningText: {
-    fontSize: 16,
-    lineHeight: 22,
-    color: colors.warning,
-    fontWeight: '800',
-  },
-  errorText: {
-    fontSize: 16,
-    lineHeight: 22,
-    color: colors.error,
-    fontWeight: '800',
+  suggestionsList: {
+    gap: spacing.xs,
   },
   manualCard: {
     backgroundColor: colors.surface,
@@ -866,21 +1007,31 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.lg,
     gap: spacing.md,
+    ...shadows.sm,
+  },
+  manualHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   manualLabel: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: typography.body.fontSize,
+    fontWeight: '700',
     color: colors.text,
   },
   input: {
-    minHeight: 64,
-    borderWidth: borders.standard,
+    minHeight: 52,
+    borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    fontSize: 18,
-    fontWeight: '700',
+    paddingHorizontal: spacing.md,
+    fontSize: typography.body.fontSize,
+    fontWeight: '600',
     color: colors.text,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceHover,
+  },
+  footerActions: {
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
 });

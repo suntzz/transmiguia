@@ -2,9 +2,10 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { triggerSelectionHaptic } from '@/src/services/hapticsService';
-import { borders, colors, radius, spacing, touchTargets } from '@/src/utils/theme';
+import { colors, radius, shadows, spacing, touchTargets } from '@/src/utils/theme';
 
-export type AccessibleButtonVariant = 'primary' | 'secondary' | 'accent' | 'danger';
+export type AccessibleButtonVariant = 'primary' | 'secondary' | 'accent' | 'danger' | 'ghost';
+export type AccessibleButtonSize = 'standard' | 'large' | 'compact';
 
 type AccessibleButtonProps = {
   label: string;
@@ -12,9 +13,11 @@ type AccessibleButtonProps = {
   hint?: string;
   accessibilityLabel?: string;
   variant?: AccessibleButtonVariant;
+  size?: AccessibleButtonSize;
   disabled?: boolean;
   icon?: React.ReactNode;
   subtitle?: string;
+  fullWidth?: boolean;
 };
 
 export function AccessibleButton({
@@ -23,9 +26,11 @@ export function AccessibleButton({
   hint,
   accessibilityLabel,
   variant = 'primary',
+  size = 'standard',
   disabled = false,
   icon,
   subtitle,
+  fullWidth = true,
 }: AccessibleButtonProps) {
   const handlePress = () => {
     if (disabled) return;
@@ -35,6 +40,15 @@ export function AccessibleButton({
 
   const getVariantStyles = (pressed: boolean) => {
     switch (variant) {
+      case 'secondary':
+        return {
+          container: [
+            styles.secondary,
+            pressed && styles.secondaryPressed,
+          ],
+          text: styles.secondaryText,
+          subtext: styles.secondarySubtext,
+        };
       case 'accent':
         return {
           container: [
@@ -53,14 +67,14 @@ export function AccessibleButton({
           text: styles.dangerText,
           subtext: styles.dangerSubtext,
         };
-      case 'secondary':
+      case 'ghost':
         return {
           container: [
-            styles.secondary,
-            pressed && styles.secondaryPressed,
+            styles.ghost,
+            pressed && styles.ghostPressed,
           ],
-          text: styles.secondaryText,
-          subtext: styles.secondarySubtext,
+          text: styles.ghostText,
+          subtext: styles.ghostSubtext,
         };
       case 'primary':
       default:
@@ -72,6 +86,18 @@ export function AccessibleButton({
           text: styles.primaryText,
           subtext: styles.primarySubtext,
         };
+    }
+  };
+
+  const getSizeStyle = () => {
+    switch (size) {
+      case 'large':
+        return styles.sizeLarge;
+      case 'compact':
+        return styles.sizeCompact;
+      case 'standard':
+      default:
+        return styles.sizeStandard;
     }
   };
 
@@ -89,6 +115,8 @@ export function AccessibleButton({
         const variantStyle = getVariantStyles(pressed);
         return [
           styles.base,
+          getSizeStyle(),
+          fullWidth && styles.fullWidth,
           variantStyle.container,
           disabled && styles.disabled,
         ];
@@ -129,24 +157,35 @@ export function AccessibleButton({
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: touchTargets.primary,
     borderRadius: radius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  fullWidth: {
     width: '100%',
-    borderWidth: borders.standard,
+  },
+  sizeStandard: {
+    minHeight: touchTargets.primary,
+    paddingVertical: spacing.sm,
+  },
+  sizeLarge: {
+    minHeight: 62,
+    paddingVertical: spacing.md,
+  },
+  sizeCompact: {
+    minHeight: touchTargets.minSize,
+    paddingVertical: spacing.xs,
   },
   contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    width: '100%',
   },
   iconContainer: {
-    marginRight: spacing.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   textContainer: {
     alignItems: 'center',
@@ -154,23 +193,25 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   label: {
-    fontSize: 20,
-    lineHeight: 26,
-    fontWeight: '800',
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '600',
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '700',
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '400',
     textAlign: 'center',
-    marginTop: 2,
+    marginTop: 1,
   },
 
-  // Primary: Crimson Red with pure white text
+  // Primary: TransMilenio Red with subtle modern shadow
   primary: {
     backgroundColor: colors.primary,
-    borderColor: colors.primaryPressed,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    ...shadows.subtle,
   },
   primaryPressed: {
     backgroundColor: colors.primaryPressed,
@@ -178,64 +219,90 @@ const styles = StyleSheet.create({
   },
   primaryText: {
     color: colors.textInverse,
+    fontWeight: '700',
   },
   primarySubtext: {
-    color: '#FFE4E6',
+    color: '#FEE2E2',
   },
 
-  // Secondary: Pure White surface with deep black text & border
+  // Secondary: Clean white surface with subtle 1px border
   secondary: {
     backgroundColor: colors.surface,
-    borderColor: colors.border,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    ...shadows.subtle,
   },
   secondaryPressed: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.surfaceSubtle,
   },
   secondaryText: {
     color: colors.text,
+    fontWeight: '600',
   },
   secondarySubtext: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
   },
 
-  // Accent: High-Visibility Safety Amber (Maximum contrast & urgency)
+  // Accent: High-Glanceability Safety Amber
   accent: {
     backgroundColor: colors.accent,
-    borderColor: colors.border,
-    borderWidth: borders.bold,
+    borderWidth: 1,
+    borderColor: colors.accentPressed,
+    ...shadows.subtle,
   },
   accentPressed: {
     backgroundColor: colors.accentPressed,
   },
   accentText: {
     color: colors.accentText,
+    fontWeight: '700',
   },
   accentSubtext: {
-    color: colors.accentText,
+    color: colors.textSecondary,
   },
 
-  // Danger: High-contrast alert
+  // Danger: Refined error red
   danger: {
     backgroundColor: colors.error,
-    borderColor: '#991B1B',
+    borderWidth: 1,
+    borderColor: colors.errorPressed,
   },
   dangerPressed: {
-    backgroundColor: '#991B1B',
+    backgroundColor: colors.errorPressed,
   },
   dangerText: {
     color: colors.textInverse,
+    fontWeight: '700',
   },
   dangerSubtext: {
     color: '#FEE2E2',
   },
 
+  // Ghost: Borderless and lightweight
+  ghost: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+  ghostPressed: {
+    backgroundColor: colors.surfaceSubtle,
+  },
+  ghostText: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  ghostSubtext: {
+    color: colors.textSecondary,
+  },
+
   // Disabled State
   disabled: {
-    opacity: 0.5,
+    opacity: 0.45,
     backgroundColor: colors.surfaceMuted,
-    borderColor: colors.borderMuted,
+    borderColor: colors.border,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   disabledText: {
-    color: colors.textSoft,
+    color: colors.textSecondary,
   },
 });

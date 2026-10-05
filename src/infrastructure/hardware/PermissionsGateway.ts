@@ -8,7 +8,7 @@ import { expoLocationGateway } from './ExpoLocationGateway';
 const MICROPHONE_PERMISSION =
   Platform.OS === 'android' && PermissionsAndroid?.PERMISSIONS
     ? PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
-    : '';
+    : undefined;
 
 const LOCATION_PERMISSIONS =
   Platform.OS === 'android' && PermissionsAndroid?.PERMISSIONS
@@ -75,15 +75,17 @@ export class PermissionsGateway implements IPermissionsGateway {
       };
     }
 
-    const microphoneResponse = await PermissionsAndroid.requestMultiple([
-      MICROPHONE_PERMISSION,
+    const permissionsToRequest = [
+      ...(MICROPHONE_PERMISSION ? [MICROPHONE_PERMISSION] : []),
       ...LOCATION_PERMISSIONS,
-    ]);
+    ];
+    const microphoneResponse = await PermissionsAndroid.requestMultiple(permissionsToRequest);
     const location = await expoLocationGateway.requestPermission();
     const gpsEnabled = await expoLocationGateway.isServicesEnabled();
 
-    const microphone =
-      microphoneResponse[MICROPHONE_PERMISSION] === PermissionsAndroid.RESULTS.GRANTED;
+    const microphone = MICROPHONE_PERMISSION
+      ? microphoneResponse[MICROPHONE_PERMISSION] === PermissionsAndroid.RESULTS.GRANTED
+      : true;
     const fallbackLocation = LOCATION_PERMISSIONS.some(
       (permission) => microphoneResponse[permission] === PermissionsAndroid.RESULTS.GRANTED
     );

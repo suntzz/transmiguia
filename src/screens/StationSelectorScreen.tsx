@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { AccessibleButton } from '@/src/components/AccessibleButton';
 import { ScreenContainer } from '@/src/components/ScreenContainer';
@@ -34,7 +35,7 @@ import {
   stopVoiceRecognition,
 } from '@/src/services/voiceService';
 import { RootStackParamList } from '@/src/utils/navigation';
-import { borders, colors, radius, spacing } from '@/src/utils/theme';
+import { colors, radius, shadows, spacing, touchTargets } from '@/src/utils/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StationSelector'>;
 
@@ -266,30 +267,46 @@ export function StationSelectorScreen({ navigation }: Props) {
 
   return (
     <ScreenContainer>
-      <Text accessibilityRole="header" style={styles.title}>
-        Elegir estacion de destino
-      </Text>
+      <View style={styles.header}>
+        <Text accessibilityRole="header" style={styles.title}>
+          Elegir estación de destino
+        </Text>
+        <Text style={styles.subtitle}>
+          Busca por nombre, explora por troncal o usa tu voz
+        </Text>
+      </View>
+
+      {/* Selected Route Summary Card */}
       <View style={styles.routeCard}>
-        <Text style={styles.routeLabel}>Origen → Destino</Text>
+        <View style={styles.routeHeader}>
+          <MaterialIcons name="route" size={18} color={colors.primary} />
+          <Text style={styles.routeLabel}>Trayecto planeado</Text>
+        </View>
         <View style={styles.routeRow}>
-          <View style={[styles.routeBadge, styles.originBadge]}>
-            <Text style={styles.originBadgeText}>Ubicacion actual</Text>
+          <View style={styles.originBadge}>
+            <Text style={styles.badgeSublabel}>ORIGEN</Text>
+            <Text numberOfLines={1} style={styles.originBadgeText}>Ubicación actual</Text>
           </View>
-            <Text style={styles.routeArrow}>→</Text>
-          <View style={[styles.routeBadge, styles.destinationBadge]}>
-            <Text style={styles.destinationBadgeText}>
+          <MaterialIcons name="arrow-forward" size={18} color={colors.primary} />
+          <View style={[styles.destinationBadge, hasSelectedDestination && styles.destinationBadgeSelected]}>
+            <Text style={[styles.badgeSublabel, hasSelectedDestination && styles.badgeSublabelSelected]}>DESTINO</Text>
+            <Text numberOfLines={1} style={[styles.destinationBadgeText, hasSelectedDestination && styles.destinationBadgeTextSelected]}>
               {hasSelectedDestination ? destinationStation.name : 'Sin seleccionar'}
             </Text>
           </View>
         </View>
       </View>
+
+      {/* Voice Assistant Search Button */}
       <AccessibleButton
-        label={isListening ? 'Detener escucha' : 'Escuchar destino por voz'}
-        hint="Activa el microfono para decir el nombre de una estacion"
+        label={isListening ? 'Detener escucha' : 'Buscar destino por voz'}
+        variant={isListening ? 'accent' : 'secondary'}
+        icon={<MaterialIcons name={isListening ? 'mic-off' : 'mic'} size={20} color={isListening ? colors.accentText : colors.primary} />}
+        hint="Activa el micrófono para decir el nombre de una estación"
         accessibilityLabel={
           isListening
             ? 'Detener escucha del destino'
-            : 'Escuchar destino por voz'
+            : 'Buscar destino por voz con micrófono'
         }
         onPress={() => {
           void handleListen();
@@ -299,47 +316,73 @@ export function StationSelectorScreen({ navigation }: Props) {
       {isListening || partialHeardText || finalHeardText || voiceError ? (
         <View style={styles.voiceCard}>
           <View style={styles.voiceHeader}>
-            <Text style={styles.voiceLabel}>Texto en vivo</Text>
-            {isListening ? <Text style={styles.voiceBadge}>Escuchando</Text> : null}
+            <View style={styles.voiceHeaderTitleRow}>
+              <MaterialIcons name="hearing" size={18} color={colors.primary} />
+              <Text style={styles.voiceLabel}>Transcripción en vivo</Text>
+            </View>
+            {isListening ? (
+              <View style={styles.listeningBadge}>
+                <View style={styles.listeningDot} />
+                <Text style={styles.voiceBadge}>Escuchando</Text>
+              </View>
+            ) : null}
           </View>
           <Text style={[styles.voiceValue, !partialHeardText && styles.voicePlaceholder]}>
             {isListening
-              ? partialHeardText || 'Habla ahora.'
-              : 'Activa el microfono para ver lo que dices.'}
+              ? partialHeardText || 'Habla ahora claro y cerca al micrófono...'
+              : 'Resultado de voz procesado.'}
           </Text>
-          <Text style={styles.voiceLabel}>Resultado final</Text>
-          <Text style={[styles.voiceFinalValue, !finalHeardText && styles.voicePlaceholder]}>
-            {finalHeardText || 'Esperando resultado final.'}
-          </Text>
-          {voiceError ? <Text style={styles.voiceError}>{voiceError}</Text> : null}
+          {finalHeardText ? (
+            <View style={styles.voiceFinalRow}>
+              <Text style={styles.voiceFinalLabel}>Detectado:</Text>
+              <Text style={styles.voiceFinalValue}>{finalHeardText}</Text>
+            </View>
+          ) : null}
+          {voiceError ? (
+            <View style={styles.voiceErrorRow}>
+              <MaterialIcons name="error-outline" size={16} color={colors.error} />
+              <Text style={styles.voiceError}>{voiceError}</Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
-      <Text style={[styles.subtitle, { marginTop: spacing.md }]}>
-        O elige el destino manualmente:
-      </Text>
+      {/* Search Input Container */}
+      <View style={styles.searchContainer}>
+        <MaterialIcons name="search" size={22} color={colors.textSecondary} style={styles.searchIcon} />
+        <TextInput
+          value={query}
+          onChangeText={(text) => {
+            setQuery(text);
+            if (text.trim().length > 0) {
+              setSelectedZone(null);
+            } else if (!selectedZone && zones.length > 0) {
+              setSelectedZone(zones[0]);
+            }
+          }}
+          placeholder="Buscar estación por nombre"
+          placeholderTextColor={colors.textSecondary}
+          accessibilityLabel="Buscar estación de TransMilenio por texto"
+          accessibilityHint="Escribe el nombre de la estación para filtrar la lista"
+          style={styles.searchInput}
+        />
+        {query ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Borrar búsqueda"
+            onPress={() => setQuery('')}
+            hitSlop={touchTargets.hitSlop}
+            style={styles.clearSearchButton}>
+            <MaterialIcons name="close" size={18} color={colors.textSecondary} />
+          </Pressable>
+        ) : null}
+      </View>
 
-      <TextInput
-        value={query}
-        onChangeText={(text) => {
-          setQuery(text);
-          if (text.trim().length > 0) {
-            setSelectedZone(null);
-          } else if (!selectedZone && zones.length > 0) {
-            setSelectedZone(zones[0]);
-          }
-        }}
-        placeholder="Buscar estación por nombre"
-        placeholderTextColor={colors.textSoft}
-        accessibilityLabel="Buscar estación de TransMilenio por texto"
-        accessibilityHint="Escribe el nombre de la estación para filtrar la lista"
-        style={styles.searchInput}
-      />
-
+      {/* Troncal Filter Chips */}
       {!query ? (
         <View style={styles.zoneSliderContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.zoneSlider}>
-            {zones.map(zone => {
+            {zones.map((zone) => {
               const isActive = selectedZone === zone;
               return (
                 <Pressable
@@ -361,9 +404,14 @@ export function StationSelectorScreen({ navigation }: Props) {
           </ScrollView>
         </View>
       ) : null}
+
+      {/* Station List */}
       <View style={styles.list}>
         {displayedStations.length === 0 && !query ? (
-          <Text style={styles.emptyText}>Selecciona una zona arriba para ver sus estaciones.</Text>
+          <View style={styles.emptyContainer}>
+            <MaterialIcons name="map" size={32} color={colors.textSecondary} />
+            <Text style={styles.emptyText}>Selecciona una troncal arriba para explorar sus estaciones.</Text>
+          </View>
         ) : displayedStations.map((station) => {
           const selected = hasSelectedDestination && destinationStation.id === station.id;
 
@@ -387,32 +435,46 @@ export function StationSelectorScreen({ navigation }: Props) {
               onPressIn={() => {
                 void triggerSelectionHaptic();
               }}>
-              <View style={styles.stationHeader}>
-                <Text
-                  allowFontScaling={true}
-                  style={[styles.stationName, selected && styles.stationNameSelected]}>
-                  {station.name}
-                </Text>
+              <View style={styles.stationContentRow}>
+                <View style={[styles.stationIconCircle, selected && styles.stationIconCircleSelected]}>
+                  <MaterialIcons
+                    name={selected ? 'place' : 'directions-bus'}
+                    size={20}
+                    color={selected ? colors.primary : colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.stationDetails}>
+                  <Text
+                    allowFontScaling={true}
+                    style={[styles.stationName, selected && styles.stationNameSelected]}>
+                    {station.name}
+                  </Text>
+                  <Text allowFontScaling={true} style={styles.stationMeta}>
+                    {station.troncal} • Parada #{station.order}
+                  </Text>
+                </View>
                 {station.isActive === false ? (
                   <View style={styles.inactiveBadge}>
-                    <Text style={styles.inactiveBadgeText}>No disponible</Text>
+                    <Text style={styles.inactiveBadgeText}>Cerrada</Text>
                   </View>
                 ) : selected ? (
                   <View style={styles.selectedBadge}>
+                    <MaterialIcons name="check" size={14} color={colors.textInverse} />
                     <Text style={styles.selectedBadgeText}>Destino</Text>
                   </View>
-                ) : null}
+                ) : (
+                  <MaterialIcons name="chevron-right" size={22} color={colors.borderMedium} />
+                )}
               </View>
-              <Text allowFontScaling={true} style={styles.stationMeta}>
-                {station.troncal} • Orden {station.order}
-              </Text>
             </Pressable>
           );
         })}
       </View>
+
       <AccessibleButton
         label="Volver al inicio"
         variant="secondary"
+        icon={<MaterialIcons name="arrow-back" size={20} color={colors.text} />}
         hint="Regresa a la pantalla principal sin cambiar el flujo"
         accessibilityLabel="Volver al inicio"
         onPress={() => navigation.navigate('Home')}
@@ -422,243 +484,333 @@ export function StationSelectorScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    gap: 4,
+    paddingVertical: spacing.xs,
+  },
   title: {
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 24,
+    lineHeight: 30,
     fontWeight: '800',
     color: colors.text,
   },
   subtitle: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.textSecondary,
   },
+
+  // Route Summary Card
   routeCard: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
     gap: spacing.sm,
+    ...shadows.subtle,
+  },
+  routeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   routeLabel: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '800',
-    color: '#FCE9EC',
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textSecondary,
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    letterSpacing: 0.5,
   },
   routeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-  },
-  routeArrow: {
-    fontSize: 22,
-    lineHeight: 28,
-    color: colors.surface,
-    fontWeight: '800',
-  },
-  routeBadge: {
-    flex: 1,
-    minHeight: 64,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.xs,
   },
   originBadge: {
-    backgroundColor: '#8E0012',
+    flex: 1,
+    backgroundColor: colors.surfaceSubtle,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
   },
   destinationBadge: {
-    backgroundColor: colors.surface,
+    flex: 1,
+    backgroundColor: colors.surfaceSubtle,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
   },
-  originBadgeText: {
-    fontSize: 17,
-    lineHeight: 22,
+  destinationBadgeSelected: {
+    backgroundColor: colors.primarySurface,
+    borderWidth: 1,
+    borderColor: colors.primaryLight,
+  },
+  badgeSublabel: {
+    fontSize: 10,
     fontWeight: '700',
-    color: colors.surface,
+    color: colors.textSecondary,
+    letterSpacing: 0.4,
   },
-  destinationBadgeText: {
-    fontSize: 17,
-    lineHeight: 22,
-    fontWeight: '800',
+  badgeSublabelSelected: {
     color: colors.primary,
   },
-  searchInput: {
-    minHeight: 64,
-    borderRadius: radius.md,
-    borderWidth: borders.standard,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.lg,
-    fontSize: 18,
+  originBadgeText: {
+    fontSize: 14,
     fontWeight: '700',
     color: colors.text,
+    marginTop: 2,
   },
+  destinationBadgeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  destinationBadgeTextSelected: {
+    color: colors.primary,
+  },
+
+  // Search Input Container
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    minHeight: 52,
+    ...shadows.subtle,
+  },
+  searchIcon: {
+    marginRight: spacing.xs,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    paddingVertical: spacing.xs,
+  },
+  clearSearchButton: {
+    padding: spacing.xs,
+  },
+
+  // Troncal Slider
   zoneSliderContainer: {
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
+    marginVertical: spacing.xxs,
   },
   zoneSlider: {
-    gap: spacing.sm,
-    paddingBottom: spacing.sm,
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
   },
   zonePill: {
     backgroundColor: colors.surface,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
     borderRadius: radius.full,
-    borderWidth: borders.standard,
-    borderColor: colors.border,
-    minHeight: 52,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    minHeight: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
   zonePillActive: {
     backgroundColor: colors.primary,
-    borderColor: colors.primaryPressed,
+    borderColor: colors.primary,
   },
   zonePillText: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
     color: colors.text,
   },
   zonePillTextActive: {
     color: colors.textInverse,
   },
-  emptyText: {
-    textAlign: 'center',
-    color: colors.textMuted,
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: spacing.lg,
-  },
+
+  // Voice Feedback Card
   voiceCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderWidth: borders.standard,
+    borderWidth: 1,
     borderColor: colors.accent,
     padding: spacing.md,
     gap: spacing.xs,
+    ...shadows.subtle,
   },
   voiceHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: spacing.sm,
   },
-  voiceBadge: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: colors.accentText,
-    backgroundColor: colors.accent,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
+  voiceHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   voiceLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+  },
+  listeningBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.accentLight,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+  },
+  listeningDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.warning,
+  },
+  voiceBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.warning,
   },
   voiceValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.text,
-  },
-  voiceFinalValue: {
-    fontSize: 18,
-    lineHeight: 26,
-    fontWeight: '800',
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '600',
     color: colors.text,
   },
   voicePlaceholder: {
-    color: colors.textSoft,
+    color: colors.textSecondary,
+    fontWeight: '400',
+  },
+  voiceFinalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.xxs,
+  },
+  voiceFinalLabel: {
+    fontSize: 12,
     fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  voiceFinalValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  voiceErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.xxs,
   },
   voiceError: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 13,
     color: colors.error,
-    fontWeight: '800',
+    fontWeight: '600',
+    flex: 1,
   },
+
+  // Station List
   list: {
-    gap: spacing.md,
+    gap: spacing.sm,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+    gap: spacing.sm,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+    maxWidth: 280,
   },
   stationButton: {
-    minHeight: 76,
+    minHeight: 64,
     borderRadius: radius.md,
-    borderWidth: borders.standard,
+    borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     justifyContent: 'center',
-    gap: 4,
+    ...shadows.subtle,
   },
   stationButtonInactive: {
-    borderColor: colors.borderMuted,
-    backgroundColor: colors.surfaceMuted,
-    opacity: 0.7,
+    opacity: 0.6,
+    backgroundColor: colors.surfaceSubtle,
   },
   stationButtonSelected: {
     borderColor: colors.primary,
-    borderWidth: borders.bold,
     backgroundColor: colors.primarySurface,
   },
   stationButtonPressed: {
-    opacity: 0.85,
+    opacity: 0.88,
   },
-  stationHeader: {
+  stationContentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  stationName: {
-    fontSize: 20,
-    lineHeight: 26,
-    fontWeight: '800',
-    color: colors.text,
+  stationIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceSubtle,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stationIconCircleSelected: {
+    backgroundColor: colors.primaryLight,
+  },
+  stationDetails: {
     flex: 1,
+    gap: 2,
+  },
+  stationName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
   },
   stationNameSelected: {
     color: colors.primary,
   },
+  stationMeta: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '400',
+  },
   selectedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xs,
     paddingVertical: 4,
     backgroundColor: colors.primary,
   },
-  inactiveBadge: {
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.borderMuted,
-  },
   selectedBadgeText: {
-    fontSize: 13,
-    fontWeight: '900',
+    fontSize: 11,
+    fontWeight: '700',
     color: colors.textInverse,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  },
+  inactiveBadge: {
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 4,
+    backgroundColor: colors.surfaceSubtle,
   },
   inactiveBadgeText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  stationMeta: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
   },
 });

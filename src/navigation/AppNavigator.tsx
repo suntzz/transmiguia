@@ -61,15 +61,16 @@ export function AppNavigator() {
         initialRouteName="Home"
         screenOptions={{
           headerTitleStyle: {
-            fontSize: 22,
-            fontWeight: '900',
-            color: colors.textInverse,
+            fontSize: 18,
+            fontWeight: '700',
+            color: colors.text,
           },
           headerStyle: {
-            backgroundColor: colors.primary,
+            backgroundColor: colors.surface,
           },
-          headerTintColor: colors.textInverse,
+          headerTintColor: colors.primary,
           headerShadowVisible: false,
+          headerTitleAlign: 'center',
           contentStyle: {
             backgroundColor: colors.background,
           },
@@ -79,20 +80,21 @@ export function AppNavigator() {
           component={HomeScreen}
           options={{
             title: 'TransMilenio Accesible',
+            headerShown: false, // The new HomeScreen has a custom, modern accessible header built-in!
           }}
         />
         <Stack.Screen
           name="StationSelector"
           component={StationSelectorScreen}
           options={{
-            title: 'Buscar Estación',
+            title: 'Seleccionar Estación',
           }}
         />
         <Stack.Screen
           name="VoicePrototype"
           component={VoicePrototypeScreen}
           options={{
-            title: 'Destino por Voz',
+            title: 'Navegación por Voz',
           }}
         />
         <Stack.Screen
@@ -141,7 +143,7 @@ export function AppNavigator() {
           name="Destination"
           component={DestinationScreen}
           options={{
-            title: 'Llegada a Destino',
+            title: 'Destino Final',
           }}
         />
       </Stack.Navigator>

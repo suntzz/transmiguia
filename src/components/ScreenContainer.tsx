@@ -1,12 +1,13 @@
 import React, { PropsWithChildren } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { useDemoMode } from '@/src/context/DemoModeContext';
 import { navigateToDemoStart } from '@/src/navigation/AppNavigator';
 import { triggerSelectionHaptic } from '@/src/services/hapticsService';
 import { stopSpeaking } from '@/src/services/speechService';
-import { borders, colors, radius, spacing, touchTargets } from '@/src/utils/theme';
+import { colors, radius, shadows, spacing, touchTargets } from '@/src/utils/theme';
 
 type ScreenContainerProps = PropsWithChildren<{
   backgroundColor?: string;
@@ -32,8 +33,9 @@ export function ScreenContainer({
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={true}>
+        showsVerticalScrollIndicator={false}>
         <View style={[styles.inner, centered && styles.innerCentered]}>{children}</View>
+
         {demoModeEnabled && showDemoBanner ? (
           <View
             accessible={true}
@@ -43,16 +45,15 @@ export function ScreenContainer({
                 ? 'Modo demostración automático activo. Puedes reiniciar o detener la simulación.'
                 : 'Modo demostración de ubicación activo. Puedes reiniciar o detener la simulación.'
             }
-            style={styles.demoBanner}>
-            <View style={styles.demoBadgeRow}>
+            style={styles.demoCard}>
+            <View style={styles.demoHeader}>
               <View style={styles.demoIndicatorDot} />
-              <Text allowFontScaling={true} style={styles.demoBannerText}>
-                {demoAutoFlowEnabled
-                  ? 'SIMULACIÓN AUTOMÁTICA ACTIVA'
-                  : 'SIMULACIÓN DE UBICACIÓN ACTIVA'}
+              <Text allowFontScaling={true} style={styles.demoTitle}>
+                {demoAutoFlowEnabled ? 'Simulación Automática' : 'Simulación Activa'}
               </Text>
             </View>
-            <View style={styles.demoBannerActions}>
+
+            <View style={styles.demoActions}>
               <Pressable
                 accessible={true}
                 accessibilityRole="button"
@@ -70,10 +71,12 @@ export function ScreenContainer({
                   styles.demoRestartButton,
                   pressed && styles.demoButtonPressed,
                 ]}>
-                <Text allowFontScaling={true} style={styles.demoRestartButtonText}>
-                  Reiniciar demo
+                <MaterialIcons name="replay" size={16} color={colors.primary} />
+                <Text allowFontScaling={true} style={styles.demoRestartText}>
+                  Reiniciar
                 </Text>
               </Pressable>
+
               <Pressable
                 accessible={true}
                 accessibilityRole="button"
@@ -90,8 +93,9 @@ export function ScreenContainer({
                   styles.demoStopButton,
                   pressed && styles.demoButtonPressed,
                 ]}>
-                <Text allowFontScaling={true} style={styles.demoStopButtonText}>
-                  Detener demo
+                <MaterialIcons name="stop" size={16} color={colors.textInverse} />
+                <Text allowFontScaling={true} style={styles.demoStopText}>
+                  Detener
                 </Text>
               </Pressable>
             </View>
@@ -109,7 +113,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    padding: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
     paddingBottom: spacing.xxl,
   },
   inner: {
@@ -119,66 +124,69 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  demoBanner: {
+  demoCard: {
     marginTop: spacing.lg,
-    padding: spacing.md,
+    padding: spacing.sm,
+    paddingHorizontal: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: colors.primarySurface,
-    borderWidth: borders.standard,
-    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primaryLight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.sm,
+    ...shadows.subtle,
   },
-  demoBadgeRow: {
+  demoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
   },
   demoIndicatorDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: colors.primary,
   },
-  demoBannerText: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '800',
+  demoTitle: {
+    fontSize: 13,
+    fontWeight: '700',
     color: colors.primary,
-    letterSpacing: 0.5,
   },
-  demoBannerActions: {
+  demoActions: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   demoButton: {
-    minHeight: 48,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    gap: 4,
+    minHeight: 36,
+    paddingHorizontal: spacing.sm,
     borderRadius: radius.sm,
-    borderWidth: borders.standard,
+    borderWidth: 1,
   },
   demoRestartButton: {
     backgroundColor: colors.surface,
-    borderColor: colors.primary,
+    borderColor: colors.borderSubtle,
   },
   demoStopButton: {
     backgroundColor: colors.primary,
-    borderColor: colors.primaryPressed,
+    borderColor: colors.primary,
   },
   demoButtonPressed: {
-    opacity: 0.8,
+    opacity: 0.85,
   },
-  demoRestartButtonText: {
+  demoRestartText: {
     color: colors.primary,
-    fontWeight: '800',
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '600',
   },
-  demoStopButtonText: {
+  demoStopText: {
     color: colors.textInverse,
-    fontWeight: '800',
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

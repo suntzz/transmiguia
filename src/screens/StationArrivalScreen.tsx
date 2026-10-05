@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { AccessibleButton } from '@/src/components/AccessibleButton';
@@ -27,12 +28,12 @@ import { getFirstBusLeg, getRouteWithTransfers } from '@/src/services/transmilen
 import { useStopSpeechOnBlur } from '@/src/hooks/useStopSpeechOnBlur';
 import { useStopDemoOnBack } from '@/src/hooks/useStopDemoOnBack';
 import { RootStackParamList } from '@/src/utils/navigation';
-import { borders, colors, radius, spacing } from '@/src/utils/theme';
+import { borders, colors, radius, shadows, spacing, typography } from '@/src/utils/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StationArrival'>;
 
 export function StationArrivalScreen({ navigation }: Props) {
-  useScreenAnnouncement('Llegaste a la estacion. Siguiente paso: abordar el bus.');
+  useScreenAnnouncement('Llegaste a la estación. Siguiente paso: abordar el bus.');
   useStopSpeechOnBlur();
   const {
     demoAutoFlowEnabled,
@@ -82,7 +83,7 @@ export function StationArrivalScreen({ navigation }: Props) {
       });
 
       await triggerTransferHaptic();
-      await speakAndWait('Has llegado a la estacion. Espera aqui para abordar.', {
+      await speakAndWait('Has llegado a la estación. Espera aquí para abordar.', {
         key: `station-arrival-${destinationStation.id}`,
         minIntervalMs: 0,
         interrupt: true,
@@ -196,130 +197,251 @@ export function StationArrivalScreen({ navigation }: Props) {
 
   return (
     <ScreenContainer>
-      <View style={styles.hero}>
-        <Text style={styles.check}>✓</Text>
+      {/* Hero Waiting/Boarding Card */}
+      <View style={styles.heroCard}>
+        <View style={styles.topRow}>
+          <View style={[styles.iconCircle, busReady ? styles.iconCircleReady : styles.iconCircleWaiting]}>
+            <MaterialIcons
+              name="directions-bus"
+              size={26}
+              color={busReady ? colors.success : colors.primary}
+            />
+          </View>
+          <View style={[styles.statusBadge, busReady ? styles.statusBadgeReady : styles.statusBadgeWaiting]}>
+            <Text style={[styles.statusBadgeText, busReady ? styles.statusBadgeTextReady : styles.statusBadgeTextWaiting]}>
+              {busReady ? 'LISTO PARA ABORDAR' : 'ESPERANDO EN PLATAFORMA'}
+            </Text>
+          </View>
+        </View>
+
         <Text accessibilityRole="header" style={styles.title}>
           Bus en camino
         </Text>
         <Text style={styles.subtitle}>
           {firstLeg
             ? `Bus ${firstLeg.routeCode} hacia el ${firstLeg.direction.toLowerCase()}`
-            : 'Espera el momento de abordar'}
+            : 'Espera en plataforma el momento de abordar'}
         </Text>
       </View>
+
+      {/* Leg Segment Details Card */}
       <View style={styles.infoCard}>
-        <Text style={styles.infoLabel}>Siguiente tramo</Text>
+        <View style={styles.segmentHeader}>
+          <MaterialIcons name="timeline" size={18} color={colors.primary} />
+          <Text style={styles.infoLabel}>Siguiente tramo</Text>
+        </View>
         <Text style={styles.infoValue}>
           {firstLeg ? `${firstLeg.from.name} a ${firstLeg.to.name}` : destinationStation.name}
         </Text>
-        <Text style={styles.infoHelper}>
-          {busReady
-            ? 'Ya puedes subir al bus y continuar el seguimiento.'
-            : 'Te avisaremos cuando puedas abordar.'}
-        </Text>
-        {detectedBusCode ? (
+
+        <View style={styles.divider} />
+
+        <View style={styles.helperRow}>
+          <MaterialIcons
+            name={busReady ? 'check-circle' : 'info'}
+            size={18}
+            color={busReady ? colors.success : colors.textSecondary}
+          />
           <Text style={styles.infoHelper}>
-            Bus detectado: {detectedBusCode === 'otro' ? 'No coincide con tu ruta' : detectedBusCode}
+            {busReady
+              ? 'Ya puedes subir al bus y continuar el seguimiento.'
+              : 'Te avisaremos cuando el bus se detenga y abra puertas.'}
           </Text>
+        </View>
+
+        {detectedBusCode ? (
+          <View style={[styles.detectedBadge, detectedBusCode === 'otro' ? styles.detectedMismatch : styles.detectedMatch]}>
+            <MaterialIcons
+              name={detectedBusCode === 'otro' ? 'warning' : 'verified'}
+              size={18}
+              color={detectedBusCode === 'otro' ? colors.warning : colors.success}
+            />
+            <Text style={styles.detectedText}>
+              Bus detectado: {detectedBusCode === 'otro' ? 'No coincide con tu ruta' : detectedBusCode}
+            </Text>
+          </View>
         ) : null}
       </View>
-      <AccessibleButton
-        label={busReady ? 'Abordar ahora' : 'Esperando el bus'}
-        hint={
-          busReady
-            ? 'Continuar al seguimiento de paradas'
-            : 'Espera unos segundos mientras llega el bus'
-        }
-        disabled={!busReady}
-        onPress={() => navigation.replace('BusTracking')}
-      />
-      {busReady && firstLeg ? (
+
+      {/* Action Buttons */}
+      <View style={styles.actions}>
         <AccessibleButton
-          label="Este no es mi bus"
-          variant="secondary"
-          hint="Pedir ayuda para esperar el bus correcto"
-          onPress={() => {
-            setBusReady(false);
-            setDetectedBusCode('otro');
-            void triggerTransferHaptic();
-            void speakBusSuitability({
-              expectedBusCode: firstLeg.routeCode,
-              detectedBusCode: 'otro',
-              isCorrectBus: false,
-            }).then(async () => {
-              await waitForSpeechToSettle(1800);
-              setDetectedBusCode(firstLeg.routeCode);
-              setBusReady(true);
-              await speakBusApproaching(firstLeg);
-              await speakBusSuitability({
-                expectedBusCode: firstLeg.routeCode,
-                detectedBusCode: firstLeg.routeCode,
-                isCorrectBus: true,
-              });
-              await speakBoardingReady(firstLeg);
-            });
-          }}
+          label={busReady ? 'Abordar ahora' : 'Esperando el bus'}
+          icon={busReady ? 'login' : 'schedule'}
+          variant={busReady ? 'primary' : 'secondary'}
+          hint={
+            busReady
+              ? 'Continuar al seguimiento de paradas'
+              : 'Espera unos segundos mientras llega el bus'
+          }
+          disabled={!busReady}
+          onPress={() => navigation.replace('BusTracking')}
         />
-      ) : null}
+
+        {busReady && firstLeg ? (
+          <AccessibleButton
+            label="Este no es mi bus"
+            variant="ghost"
+            icon="help-outline"
+            hint="Pedir ayuda para esperar el bus correcto"
+            onPress={() => {
+              setBusReady(false);
+              setDetectedBusCode('otro');
+              void triggerTransferHaptic();
+              void speakBusSuitability({
+                expectedBusCode: firstLeg.routeCode,
+                detectedBusCode: 'otro',
+                isCorrectBus: false,
+              }).then(async () => {
+                await waitForSpeechToSettle(1800);
+                setDetectedBusCode(firstLeg.routeCode);
+                setBusReady(true);
+                await speakBusApproaching(firstLeg);
+                await speakBusSuitability({
+                  expectedBusCode: firstLeg.routeCode,
+                  detectedBusCode: firstLeg.routeCode,
+                  isCorrectBus: true,
+                });
+                await speakBoardingReady(firstLeg);
+              });
+            }}
+          />
+        ) : null}
+      </View>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    backgroundColor: colors.dark,
+  heroCard: {
+    backgroundColor: colors.surface,
     borderRadius: radius.lg,
     padding: spacing.xl,
-    gap: spacing.sm,
-    alignItems: 'center',
     borderWidth: borders.standard,
     borderColor: colors.border,
+    ...shadows.sm,
+    gap: spacing.xs,
   },
-  check: {
-    fontSize: 48,
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconCircleWaiting: {
+    backgroundColor: colors.primaryLight,
+  },
+  iconCircleReady: {
+    backgroundColor: '#E8F5E9',
+  },
+  statusBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.full,
+    borderWidth: 1,
+  },
+  statusBadgeWaiting: {
+    backgroundColor: colors.accentLight,
+    borderColor: colors.accent,
+  },
+  statusBadgeReady: {
+    backgroundColor: '#E8F5E9',
+    borderColor: colors.success,
+  },
+  statusBadgeText: {
+    fontSize: typography.caption.fontSize,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  statusBadgeTextWaiting: {
+    color: colors.accentText,
+  },
+  statusBadgeTextReady: {
     color: colors.success,
-    fontWeight: '900',
   },
   title: {
-    fontSize: 30,
-    lineHeight: 38,
-    fontWeight: '900',
-    color: colors.textInverse,
-    textAlign: 'center',
+    fontSize: typography.h2.fontSize,
+    fontWeight: typography.h2.fontWeight,
+    color: colors.text,
+    letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 18,
-    lineHeight: 26,
-    color: '#F3F4F6',
-    textAlign: 'center',
-    fontWeight: '700',
+    fontSize: typography.body.fontSize,
+    lineHeight: typography.body.lineHeight,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   infoCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: borders.standard,
     borderColor: colors.border,
-    padding: spacing.xl,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    ...shadows.sm,
+  },
+  segmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.xs,
   },
   infoLabel: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '900',
+    fontSize: typography.caption.fontSize,
+    fontWeight: '700',
     color: colors.primary,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
   },
   infoValue: {
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: '900',
+    fontSize: typography.h3.fontSize,
+    fontWeight: typography.h3.fontWeight,
     color: colors.text,
   },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.xxs,
+  },
+  helperRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+  },
   infoHelper: {
-    fontSize: 17,
-    lineHeight: 24,
-    color: colors.textMuted,
-    fontWeight: '700',
+    flex: 1,
+    fontSize: typography.bodySecondary.fontSize,
+    lineHeight: typography.bodySecondary.lineHeight,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  detectedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    marginTop: spacing.xxs,
+  },
+  detectedMatch: {
+    backgroundColor: '#E8F5E9',
+  },
+  detectedMismatch: {
+    backgroundColor: '#FFF8E1',
+  },
+  detectedText: {
+    fontSize: typography.bodySecondary.fontSize,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  actions: {
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
 });
