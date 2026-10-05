@@ -25,6 +25,24 @@ Module._resolveFilename = function (request, parent, isMain, options) {
   if (request === 'expo-haptics') {
     return path.resolve(process.cwd(), 'scripts/mocks/expo-haptics.mjs');
   }
+  if (request === '@react-navigation/native') {
+    return path.resolve(process.cwd(), 'scripts/mocks/react-navigation-native.mjs');
+  }
+  if (request === '@react-navigation/native-stack') {
+    return path.resolve(process.cwd(), 'scripts/mocks/react-navigation-native-stack.mjs');
+  }
+  if (request === 'react-native-safe-area-context') {
+    return path.resolve(process.cwd(), 'scripts/mocks/react-native-safe-area-context.mjs');
+  }
+  if (request === 'react-native-gesture-handler') {
+    return path.resolve(process.cwd(), 'scripts/mocks/react-native-gesture-handler.mjs');
+  }
+  if (request === 'react-native-maps') {
+    return path.resolve(process.cwd(), 'scripts/mocks/react-native-maps.mjs');
+  }
+  if (request === 'expo-speech-recognition') {
+    return path.resolve(process.cwd(), 'scripts/mocks/expo-speech-recognition.mjs');
+  }
 
   let target = request;
   if (target.startsWith('@/')) {
@@ -54,6 +72,7 @@ const compileTs = function (module, filename) {
       module: ts.ModuleKind.CommonJS,
       target: ts.ScriptTarget.ES2022,
       esModuleInterop: true,
+      jsx: ts.JsxEmit.React,
     },
   }).outputText;
   module._compile(transpiled, filename);
@@ -364,6 +383,184 @@ async function runAllSuites() {
     test('permissionsService exporta solicitudes multiplataforma', () => {
       assert(typeof permissionsService.checkAppPermissions === 'function');
       assert(typeof permissionsService.requestAppPermissions === 'function');
+    });
+  });
+
+  // --- Suite 7: Componentes y Pantallas Accesibles (Frontend UI Screens) ---
+  describe('Componentes Accesibles y Pantallas Frontend (10 Pantallas UI)', () => {
+    const React = require('react');
+    const ReactDOMServer = require('react-dom/server');
+    const { RouteProvider } = require('@/src/context/RouteContext.tsx');
+    const { DemoModeProvider } = require('@/src/context/DemoModeContext.tsx');
+    const { colors, borders, touchTargets } = require('@/src/utils/theme.ts');
+    const { AccessibleButton } = require('@/src/components/AccessibleButton.tsx');
+    const { ScreenContainer } = require('@/src/components/ScreenContainer.tsx');
+
+    // Screens
+    const { HomeScreen } = require('@/src/screens/HomeScreen.tsx');
+    const { StationSelectorScreen } = require('@/src/screens/StationSelectorScreen.tsx');
+    const { DestinationScreen } = require('@/src/screens/DestinationScreen.tsx');
+    const { RoutePreviewScreen } = require('@/src/screens/RoutePreviewScreen.tsx');
+    const { WalkingGuideScreen } = require('@/src/screens/WalkingGuideScreen.tsx');
+    const { StationAlertScreen } = require('@/src/screens/StationAlertScreen.tsx');
+    const { StationArrivalScreen } = require('@/src/screens/StationArrivalScreen.tsx');
+    const { BusTrackingScreen } = require('@/src/screens/BusTrackingScreen.tsx');
+    const { DropAlertScreen } = require('@/src/screens/DropAlertScreen.tsx');
+    const { VoicePrototypeScreen } = require('@/src/screens/VoicePrototypeScreen.tsx');
+
+    function createMockNavigation() {
+      return {
+        navigate: () => {},
+        replace: () => {},
+        push: () => {},
+        popToTop: () => {},
+        goBack: () => {},
+        dispatch: () => {},
+        setOptions: () => {},
+        addListener: () => ({ remove: () => {} }),
+        isFocused: () => true,
+      };
+    }
+
+    function renderScreen(Component, customProps = {}) {
+      const nav = createMockNavigation();
+      const defaultRoute = { key: Component.name, name: Component.name, params: {} };
+      const props = {
+        navigation: nav,
+        route: defaultRoute,
+        ...customProps,
+      };
+
+      return ReactDOMServer.renderToStaticMarkup(
+        React.createElement(
+          RouteProvider,
+          null,
+          React.createElement(
+            DemoModeProvider,
+            null,
+            React.createElement(Component, props)
+          )
+        )
+      );
+    }
+
+    test('Theme Tokens cumplen directrices WCAG 2.2 AAA y ergonomia táctil', () => {
+      assert(touchTargets.primary >= 76, 'Botones primarios deben medir al menos 76dp para discapacidad visual');
+      assert(touchTargets.minSize >= 56, 'Target tactil minimo debe ser >= 56dp');
+      assert(touchTargets.hitSlop.top >= 12, 'HitSlop debe ser >= 12dp');
+      assert.strictEqual(colors.accent, '#FFB703', 'Safety amber de alta visibilidad calibrado');
+      assert.strictEqual(colors.dark, '#0A0A0A', 'Fondo oscuro de alto contraste calibrado');
+      assert(borders.standard >= 2, 'Bordes de tarjetas deben ser >= 2px para definir volumen tactil/visual');
+    });
+
+    test('AccessibleButton renderiza con atributos de accesibilidad y roles correctos', () => {
+      const rendered = ReactDOMServer.renderToStaticMarkup(
+        React.createElement(AccessibleButton, {
+          label: 'PRUEBA BOTON ACCESIBLE',
+          subtitle: 'Subtitulo explicativo',
+          variant: 'accent',
+          hint: 'Doble toque para activar',
+        })
+      );
+      assert(rendered.includes('PRUEBA BOTON ACCESIBLE'), 'Debe renderizar la etiqueta');
+      assert(rendered.includes('Subtitulo explicativo'), 'Debe renderizar el subtitulo');
+      assert(rendered.includes('accessibilityRole="button"'), 'Debe declarar accessibilityRole button');
+      assert(rendered.includes('accessibilityHint="Doble toque para activar"'), 'Debe incluir accessibilityHint');
+    });
+
+    test('ScreenContainer envuelve contenido con scroll accesible y soporte de modo demo', () => {
+      const rendered = ReactDOMServer.renderToStaticMarkup(
+        React.createElement(
+          DemoModeProvider,
+          null,
+          React.createElement(ScreenContainer, { showDemoBanner: true },
+            React.createElement('rn-text', null, 'Contenido de prueba')
+          )
+        )
+      );
+      assert(rendered.includes('Contenido de prueba'));
+      assert(rendered.includes('rn-scroll-view'));
+    });
+
+    test('HomeScreen (1/10): Renderiza dashboard con 3 botones primarios y tarjeta de estado GPS', () => {
+      const markup = renderScreen(HomeScreen);
+      assert(markup.includes('TRANSMILENIO ACCESIBLE'), 'Debe incluir titulo principal');
+      assert(markup.includes('Navegación por Voz'), 'Debe contener boton de voz');
+      assert(markup.includes('Seleccionar Destino'), 'Debe contener boton de selector');
+      assert(markup.includes('Modo Demostración'), 'Debe contener boton de demo guiada');
+      assert(markup.includes('Estado del sistema:'), 'Tarjeta de estado GPS debe tener label accesible');
+    });
+
+    test('StationSelectorScreen (2/10): Renderiza buscador accesible, chips troncales y tarjetas de estacion', () => {
+      const markup = renderScreen(StationSelectorScreen);
+      assert(markup.includes('Buscar estación por nombre'), 'Debe tener placeholder accesible');
+      assert(markup.includes('Buscar estación de TransMilenio'), 'Debe tener accessibilityLabel para TalkBack');
+      assert(markup.includes('Troncal'), 'Debe contener chips de filtro por troncales');
+      assert(markup.includes('Calle 72') || markup.includes('Flores') || markup.includes('Marly'), 'Debe listar estaciones del catalogo');
+    });
+
+    test('DestinationScreen (3/10): Renderiza felicitacion de llegada, resumen de viaje y reinicio', () => {
+      const markup = renderScreen(DestinationScreen);
+      assert(markup.includes('¡Llegaste a tu destino!'), 'Debe mostrar mensaje de llegada');
+      assert(markup.includes('ESTACIÓN FINAL'), 'Debe tener badge de estacion final');
+      assert(markup.includes('Resumen del Viaje'), 'Debe contener tarjeta de resumen');
+      assert(markup.includes('Comenzar un nuevo viaje'), 'Debe tener boton de reinicio');
+      assert(markup.includes('✓'), 'Debe tener check geometrico limpio');
+    });
+
+    test('RoutePreviewScreen (4/10): Renderiza resumen de preparacion de ruta y botones de control', () => {
+      const markup = renderScreen(RoutePreviewScreen);
+      assert(markup.includes('Preparando ruta'), 'Debe indicar preparacion de ruta');
+      assert(markup.includes('Destino'), 'Debe mostrar destino');
+      assert(markup.includes('Cambiar destino'), 'Debe permitir cambiar destino');
+      assert(markup.includes('Reiniciar demo'), 'Debe permitir reiniciar demo');
+    });
+
+    test('WalkingGuideScreen (5/10): Renderiza guia peatonal, instruccion prominente y repetir voz', () => {
+      const markup = renderScreen(WalkingGuideScreen);
+      assert(markup.includes('GUÍA PEATONAL'), 'Debe mostrar badge de guia peatonal');
+      assert(markup.includes('Repetir indicación por voz'), 'Debe incluir boton de repeticion de voz');
+      assert(markup.includes('Cambiar destino'), 'Debe permitir cambiar destino');
+    });
+
+    test('StationAlertScreen (6/10): Renderiza aviso de proximidad y guia de torniquetes TuLlave', () => {
+      const markup = renderScreen(StationAlertScreen);
+      assert(markup.includes('PROXIMIDAD'), 'Debe mostrar badge de proximidad');
+      assert(markup.includes('Estación cerca'), 'Debe mostrar titulo de proximidad');
+      assert(markup.includes('tarjeta TuLlave'), 'Debe instruir sobre ingreso y tarjeta TuLlave');
+      assert(markup.includes('Confirmar llegada a estación'), 'Debe permitir confirmar llegada');
+    });
+
+    test('StationArrivalScreen (7/10): Renderiza confirmacion de llegada y espera/abordaje de bus', () => {
+      const markup = renderScreen(StationArrivalScreen);
+      assert(markup.includes('Bus en camino'), 'Debe mostrar titulo de bus en camino');
+      assert(markup.includes('Siguiente tramo'), 'Debe indicar siguiente tramo');
+      assert(markup.includes('Esperando el bus') || markup.includes('Abordar ahora'), 'Debe contener boton de accion');
+    });
+
+    test('BusTrackingScreen (8/10): Renderiza monitoreo de viaje, tarjeta Ahora/Siguiente/Destino y paradas', () => {
+      const markup = renderScreen(BusTrackingScreen);
+      assert(markup.includes('En ruta'), 'Debe indicar que va en ruta');
+      assert(markup.includes('Ahora'), 'Debe tener indicador Ahora');
+      assert(markup.includes('Siguiente'), 'Debe tener indicador Siguiente');
+      assert(markup.includes('Destino'), 'Debe tener indicador Destino');
+      assert(markup.includes('Próximas paradas'), 'Debe listar proximas paradas');
+    });
+
+    test('DropAlertScreen (9/10): Renderiza alerta gigante de 1 parada restante y aviso de bajada', () => {
+      const markup = renderScreen(DropAlertScreen);
+      assert(markup.includes('AVISO DE BAJADA'), 'Debe contener badge de aviso de bajada');
+      assert(markup.includes('PARADA RESTANTE'), 'Debe tener indicador de 1 parada restante');
+      assert(markup.includes('Prepárate para bajar'), 'Debe advertir al usuario prepararse');
+      assert(markup.includes('Confirmar llegada a estación'), 'Debe tener boton para confirmar bajada');
+    });
+
+    test('VoicePrototypeScreen (10/10): Renderiza reconocimiento de voz, transcripcion en vivo y fallback escrito', () => {
+      const markup = renderScreen(VoicePrototypeScreen);
+      assert(markup.includes('Decir destino por voz'), 'Debe identificar el titulo del asistente de voz');
+      assert(markup.includes('Escuchar destino') || markup.includes('Detener escucha'), 'Debe tener boton de voz');
+      assert(markup.includes('Escribir destino manualmente'), 'Debe ofrecer seccion manual accesible');
+      assert(markup.includes('Usar texto escrito'), 'Debe permitir confirmar texto manual');
     });
   });
 

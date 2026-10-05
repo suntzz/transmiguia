@@ -61,14 +61,14 @@ export function AppNavigator() {
         initialRouteName="Home"
         screenOptions={{
           headerTitleStyle: {
-            fontSize: 20,
-            fontWeight: '800',
-            color: colors.surface,
+            fontSize: 22,
+            fontWeight: '900',
+            color: colors.textInverse,
           },
           headerStyle: {
             backgroundColor: colors.primary,
           },
-          headerTintColor: colors.surface,
+          headerTintColor: colors.textInverse,
           headerShadowVisible: false,
           contentStyle: {
             backgroundColor: colors.background,
@@ -78,70 +78,70 @@ export function AppNavigator() {
           name="Home"
           component={HomeScreen}
           options={{
-            title: 'Guia TransMilenio',
+            title: 'TransMilenio Accesible',
           }}
         />
         <Stack.Screen
           name="StationSelector"
           component={StationSelectorScreen}
           options={{
-            title: 'Seleccionar estacion',
+            title: 'Buscar Estación',
           }}
         />
         <Stack.Screen
           name="VoicePrototype"
           component={VoicePrototypeScreen}
           options={{
-            title: 'Simulacion de voz',
+            title: 'Destino por Voz',
           }}
         />
         <Stack.Screen
           name="RoutePreview"
           component={RoutePreviewScreen}
           options={{
-            title: 'Resumen de ruta',
+            title: 'Resumen de Ruta',
           }}
         />
         <Stack.Screen
           name="WalkingGuide"
           component={WalkingGuideScreen}
           options={{
-            title: 'Guia peatonal',
+            title: 'Guía Peatonal',
           }}
         />
         <Stack.Screen
           name="StationAlert"
           component={StationAlertScreen}
           options={{
-            title: 'Proximidad',
+            title: 'Aviso de Proximidad',
           }}
         />
         <Stack.Screen
           name="StationArrival"
           component={StationArrivalScreen}
           options={{
-            title: 'Llegada a estacion',
+            title: 'Llegada a Estación',
           }}
         />
         <Stack.Screen
           name="BusTracking"
           component={BusTrackingScreen}
           options={{
-            title: 'Seguimiento en bus',
+            title: 'Seguimiento en Bus',
           }}
         />
         <Stack.Screen
           name="DropAlert"
           component={DropAlertScreen}
           options={{
-            title: 'Aviso de bajada',
+            title: 'Aviso de Bajada',
           }}
         />
         <Stack.Screen
           name="Destination"
           component={DestinationScreen}
           options={{
-            title: 'Destino final',
+            title: 'Llegada a Destino',
           }}
         />
       </Stack.Navigator>

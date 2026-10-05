@@ -27,7 +27,7 @@ import { getFirstBusLeg, getRouteWithTransfers } from '@/src/services/transmilen
 import { useStopSpeechOnBlur } from '@/src/hooks/useStopSpeechOnBlur';
 import { useStopDemoOnBack } from '@/src/hooks/useStopDemoOnBack';
 import { RootStackParamList } from '@/src/utils/navigation';
-import { colors, radius, spacing } from '@/src/utils/theme';
+import { borders, colors, radius, spacing } from '@/src/utils/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StationArrival'>;
 
@@ -272,51 +272,54 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.sm,
     alignItems: 'center',
+    borderWidth: borders.standard,
+    borderColor: colors.border,
   },
   check: {
-    fontSize: 44,
-    color: colors.surface,
-    fontWeight: '800',
+    fontSize: 48,
+    color: colors.success,
+    fontWeight: '900',
   },
   title: {
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: '800',
-    color: colors.surface,
+    fontSize: 30,
+    lineHeight: 38,
+    fontWeight: '900',
+    color: colors.textInverse,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#E2E2E2',
+    fontSize: 18,
+    lineHeight: 26,
+    color: '#F3F4F6',
     textAlign: 'center',
+    fontWeight: '700',
   },
   infoCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderWidth: 1,
+    borderWidth: borders.standard,
     borderColor: colors.border,
-    padding: spacing.lg,
+    padding: spacing.xl,
     gap: spacing.xs,
   },
   infoLabel: {
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 18,
-    fontWeight: '800',
+    fontWeight: '900',
     color: colors.primary,
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
   },
   infoValue: {
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '800',
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '900',
     color: colors.text,
   },
   infoHelper: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 17,
+    lineHeight: 24,
     color: colors.textMuted,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

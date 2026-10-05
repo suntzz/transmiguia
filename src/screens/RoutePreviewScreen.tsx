@@ -14,7 +14,7 @@ import {
 import { useScreenAnnouncement } from '@/src/hooks/useScreenAnnouncement';
 import { useStopDemoOnBack } from '@/src/hooks/useStopDemoOnBack';
 import { RootStackParamList } from '@/src/utils/navigation';
-import { colors, radius, spacing } from '@/src/utils/theme';
+import { borders, colors, radius, spacing } from '@/src/utils/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RoutePreview'>;
 
@@ -185,43 +185,50 @@ export function RoutePreviewScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   title: {
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: '800',
+    fontSize: 30,
+    lineHeight: 38,
+    fontWeight: '900',
     color: colors.text,
   },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderWidth: 1,
+    borderWidth: borders.standard,
     borderColor: colors.border,
-    padding: spacing.lg,
+    padding: spacing.xl,
     gap: spacing.sm,
   },
   label: {
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 18,
-    fontWeight: '800',
+    fontWeight: '900',
     color: colors.primary,
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
   },
   station: {
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '700',
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '900',
     color: colors.text,
   },
   helper: {
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 17,
+    lineHeight: 24,
     color: colors.textMuted,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   status: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 22,
     color: colors.primary,
-    fontWeight: '700',
+    fontWeight: '800',
+    backgroundColor: colors.primarySurface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    alignSelf: 'flex-start',
   },
 });

@@ -34,7 +34,7 @@ import {
   stopVoiceRecognition,
 } from '@/src/services/voiceService';
 import { RootStackParamList } from '@/src/utils/navigation';
-import { colors, radius, spacing } from '@/src/utils/theme';
+import { borders, colors, radius, spacing } from '@/src/utils/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StationSelector'>;
 
@@ -329,9 +329,10 @@ export function StationSelectorScreen({ navigation }: Props) {
             setSelectedZone(zones[0]);
           }
         }}
-        placeholder="Buscar estacion por nombre"
+        placeholder="Buscar estación por nombre"
         placeholderTextColor={colors.textSoft}
-        accessibilityLabel="Buscar estacion de TransMilenio"
+        accessibilityLabel="Buscar estación de TransMilenio por texto"
+        accessibilityHint="Escribe el nombre de la estación para filtrar la lista"
         style={styles.searchInput}
       />
 
@@ -343,11 +344,14 @@ export function StationSelectorScreen({ navigation }: Props) {
               return (
                 <Pressable
                   key={zone}
-                  onPress={() => setSelectedZone(isActive ? null : zone)}
+                  onPress={() => {
+                    void triggerSelectionHaptic();
+                    setSelectedZone(isActive ? null : zone);
+                  }}
                   style={[styles.zonePill, isActive && styles.zonePillActive]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: isActive }}
-                  accessibilityLabel={`Filtrar por ${zone}`}>
+                  accessibilityLabel={`Troncal ${zone}. ${isActive ? 'Filtro seleccionado' : 'Toca para filtrar'}`}>
                   <Text style={[styles.zonePillText, isActive && styles.zonePillTextActive]}>
                     {zone.replace('Zona ', '')}
                   </Text>
@@ -366,12 +370,14 @@ export function StationSelectorScreen({ navigation }: Props) {
           return (
             <Pressable
               key={station.id}
+              accessible={true}
               onPress={() => {
                 void handleSelect(station);
               }}
               accessibilityRole="button"
-              accessibilityLabel={`Seleccionar ${station.name}${station.isActive === false ? ', no disponible' : ''}`}
-              accessibilityHint={`Troncal ${station.troncal}. Orden ${station.order}`}
+              accessibilityLabel={`Estación ${station.name}. Troncal ${station.troncal}.${station.isActive === false ? ' No disponible actualmente.' : ''}${selected ? ' Destino seleccionado actualmente.' : ''}`}
+              accessibilityHint="Toca dos veces para elegir esta estación como tu destino de viaje"
+              accessibilityState={{ selected }}
               style={({ pressed }) => [
                 styles.stationButton,
                 station.isActive === false && styles.stationButtonInactive,
@@ -382,7 +388,9 @@ export function StationSelectorScreen({ navigation }: Props) {
                 void triggerSelectionHaptic();
               }}>
               <View style={styles.stationHeader}>
-                <Text style={[styles.stationName, selected && styles.stationNameSelected]}>
+                <Text
+                  allowFontScaling={true}
+                  style={[styles.stationName, selected && styles.stationNameSelected]}>
                   {station.name}
                 </Text>
                 {station.isActive === false ? (
@@ -395,8 +403,8 @@ export function StationSelectorScreen({ navigation }: Props) {
                   </View>
                 ) : null}
               </View>
-              <Text style={styles.stationMeta}>
-                {station.troncal}
+              <Text allowFontScaling={true} style={styles.stationMeta}>
+                {station.troncal} • Orden {station.order}
               </Text>
             </Pressable>
           );
@@ -477,13 +485,14 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   searchInput: {
-    minHeight: 56,
+    minHeight: 64,
     borderRadius: radius.md,
-    borderWidth: 1,
+    borderWidth: borders.standard,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
-    fontSize: 17,
+    paddingHorizontal: spacing.lg,
+    fontSize: 18,
+    fontWeight: '700',
     color: colors.text,
   },
   zoneSliderContainer: {
@@ -495,38 +504,42 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   zonePill: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surface,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    borderWidth: borders.standard,
+    borderColor: colors.border,
+    minHeight: 52,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   zonePillActive: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    borderColor: colors.primaryPressed,
   },
   zonePillText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#4B5563',
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.text,
   },
   zonePillTextActive: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
   },
   emptyText: {
     textAlign: 'center',
     color: colors.textMuted,
-    fontSize: 15,
+    fontSize: 16,
+    fontWeight: '700',
     marginTop: spacing.lg,
   },
   voiceCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.primary,
+    borderWidth: borders.standard,
+    borderColor: colors.accent,
     padding: spacing.md,
-    gap: 6,
+    gap: spacing.xs,
   },
   voiceHeader: {
     flexDirection: 'row',
@@ -535,65 +548,69 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   voiceBadge: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.surface,
-    backgroundColor: colors.primary,
+    fontSize: 13,
+    fontWeight: '900',
+    color: colors.accentText,
+    backgroundColor: colors.accent,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: radius.sm,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   voiceLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textSoft,
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.textMuted,
   },
   voiceValue: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     color: colors.text,
   },
   voiceFinalValue: {
-    fontSize: 17,
-    lineHeight: 24,
-    fontWeight: '700',
+    fontSize: 18,
+    lineHeight: 26,
+    fontWeight: '800',
     color: colors.text,
   },
   voicePlaceholder: {
-    color: colors.textMuted,
+    color: colors.textSoft,
     fontWeight: '600',
   },
   voiceError: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.primary,
-    fontWeight: '600',
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.error,
+    fontWeight: '800',
   },
   list: {
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   stationButton: {
-    minHeight: 72,
+    minHeight: 76,
     borderRadius: radius.md,
-    borderWidth: 1,
+    borderWidth: borders.standard,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     justifyContent: 'center',
     gap: 4,
   },
   stationButtonInactive: {
-    borderColor: '#F2C7CD',
-    backgroundColor: '#FFF7F8',
+    borderColor: colors.borderMuted,
+    backgroundColor: colors.surfaceMuted,
+    opacity: 0.7,
   },
   stationButtonSelected: {
     borderColor: colors.primary,
-    backgroundColor: '#FFF1F3',
+    borderWidth: borders.bold,
+    backgroundColor: colors.primarySurface,
   },
   stationButtonPressed: {
-    opacity: 0.82,
+    opacity: 0.85,
   },
   stationHeader: {
     flexDirection: 'row',
@@ -602,8 +619,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   stationName: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: '800',
     color: colors.text,
     flex: 1,
   },
@@ -611,33 +629,36 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   selectedBadge: {
-    borderRadius: 999,
+    borderRadius: radius.sm,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
+    paddingVertical: 4,
     backgroundColor: colors.primary,
   },
   inactiveBadge: {
-    borderRadius: 999,
+    borderRadius: radius.sm,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    backgroundColor: '#FDE7EA',
+    paddingVertical: 4,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.borderMuted,
   },
   selectedBadgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.surface,
+    fontSize: 13,
+    fontWeight: '900',
+    color: colors.textInverse,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
   },
   inactiveBadgeText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
-    color: colors.primary,
+    color: colors.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
   },
   stationMeta: {
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.textMuted,
   },
 });

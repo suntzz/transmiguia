@@ -6,7 +6,7 @@ import { AccessibleButton } from '@/src/components/AccessibleButton';
 import { MapView } from '@/src/components/MapView';
 import { ScreenContainer } from '@/src/components/ScreenContainer';
 import { RootStackParamList } from '@/src/utils/navigation';
-import { colors, radius, spacing } from '@/src/utils/theme';
+import { borders, colors, radius, spacing } from '@/src/utils/theme';
 import { useBusTrackingController } from '@/src/presentation/features/bus-tracking/useBusTrackingController';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'BusTracking'>;
@@ -49,38 +49,64 @@ export function BusTrackingScreen({ navigation }: Props) {
         routeLegs={transitMapLegOverlays}
       />
 
-      <View style={styles.header}>
-        <Text accessibilityRole="header" style={styles.title}>
+      <View
+        accessible={true}
+        accessibilityRole="header"
+        accessibilityLabel={`En ruta. Estado actual: ${displayStatusLine}`}
+        style={styles.header}>
+        <Text allowFontScaling={true} style={styles.title}>
           En ruta
         </Text>
-        <Text style={styles.subtitle}>{displayStatusLine}</Text>
+        <Text allowFontScaling={true} style={styles.subtitle}>
+          {displayStatusLine}
+        </Text>
       </View>
 
       <View style={styles.listCard}>
         {displayBusLabel ? (
-          <View style={styles.busBanner}>
-            <Text style={styles.segmentLabel}>Bus actual</Text>
-            <Text style={styles.busBannerText}>{displayBusLabel}</Text>
+          <View
+            accessible={true}
+            accessibilityLabel={`Bus actual asignado: ${displayBusLabel}`}
+            style={styles.busBanner}>
+            <Text style={styles.segmentLabel}>Bus asignado</Text>
+            <Text allowFontScaling={true} style={styles.busBannerText}>
+              {displayBusLabel}
+            </Text>
           </View>
         ) : null}
 
         <View style={styles.statusGrid}>
-          <View style={styles.statusItem}>
+          <View
+            accessible={true}
+            accessibilityLabel={`Estación actual donde te encuentras: ${displayCurrentStationName}`}
+            style={styles.statusItem}>
             <Text style={styles.segmentLabel}>Ahora</Text>
-            <Text style={styles.stopCurrent}>{displayCurrentStationName}</Text>
+            <Text allowFontScaling={true} style={styles.stopCurrent}>
+              {displayCurrentStationName}
+            </Text>
           </View>
-          <View style={styles.statusItem}>
+          <View
+            accessible={true}
+            accessibilityLabel={`Siguiente parada del recorrido: ${displayNextStationName}`}
+            style={styles.statusItem}>
             <Text style={styles.segmentLabel}>Siguiente</Text>
-            <Text style={styles.stopText}>{displayNextStationName}</Text>
+            <Text allowFontScaling={true} style={styles.stopTextBold}>
+              {displayNextStationName}
+            </Text>
           </View>
-          <View style={styles.statusItem}>
+          <View
+            accessible={true}
+            accessibilityLabel={`Estación de destino final: ${destinationName}`}
+            style={styles.statusItem}>
             <Text style={styles.segmentLabel}>Destino</Text>
-            <Text style={styles.stopDestination}>{destinationName}</Text>
+            <Text allowFontScaling={true} style={styles.stopDestination}>
+              {destinationName}
+            </Text>
           </View>
         </View>
 
         <View style={styles.segmentBlock}>
-          <Text style={styles.segmentLabel}>Proximas paradas</Text>
+          <Text style={styles.segmentLabel}>Próximas paradas</Text>
           {visibleStations.map((station) => {
             const routeIndex = routeStations.findIndex(
               (routeStation) => routeStation.id === station.id
@@ -93,8 +119,20 @@ export function BusTrackingScreen({ navigation }: Props) {
                   : 'upcoming';
 
             return (
-              <View key={station.id} style={styles.stopRow}>
+              <View
+                key={station.id}
+                accessible={true}
+                accessibilityRole="text"
+                accessibilityLabel={
+                  state === 'current'
+                    ? `Estación actual: ${station.name}`
+                    : state === 'destination'
+                      ? `Destino final: ${station.name}`
+                      : `Próxima parada: ${station.name}`
+                }
+                style={[styles.stopRow, state === 'current' && styles.stopRowCurrent]}>
                 <Text
+                  allowFontScaling={true}
                   style={[
                     styles.stopText,
                     state === 'current' && styles.stopCurrent,
@@ -102,14 +140,26 @@ export function BusTrackingScreen({ navigation }: Props) {
                   ]}>
                   {station.name}
                 </Text>
+                {state === 'current' ? (
+                  <View style={styles.stopBadgeCurrent}>
+                    <Text style={styles.stopBadgeTextCurrent}>AHORA</Text>
+                  </View>
+                ) : state === 'destination' ? (
+                  <View style={styles.stopBadgeDest}>
+                    <Text style={styles.stopBadgeTextDest}>DESTINO</Text>
+                  </View>
+                ) : null}
               </View>
             );
           })}
         </View>
 
         {nextTransferStation && nextTransferStation.name !== currentStationName ? (
-          <View style={styles.transferBanner}>
-            <Text style={styles.transferText}>
+          <View
+            accessible={true}
+            accessibilityRole="alert"
+            style={styles.transferBanner}>
+            <Text allowFontScaling={true} style={styles.transferText}>
               {nextTransferWalkLeg
                 ? isJimenezTransferWalk
                   ? nextTransferLeg
@@ -120,8 +170,8 @@ export function BusTrackingScreen({ navigation }: Props) {
                       ? `Baja en ${nextTransferStation.name}. Camina y luego toma ${nextTransferLeg.routeCode}.`
                       : `Baja en ${nextTransferStation.name}. Camina hacia tu destino.`
                   : nextTransferLeg
-                    ? `Transbordo en ${nextTransferStation.name}. Cruza por el tunel y toma ${nextTransferLeg.routeCode}.`
-                    : `Transbordo en ${nextTransferStation.name}. Cruza por el tunel.`
+                    ? `Transbordo en ${nextTransferStation.name}. Cruza por el túnel y toma ${nextTransferLeg.routeCode}.`
+                    : `Transbordo en ${nextTransferStation.name}. Cruza por el túnel.`
                 : nextTransferLeg
                   ? `Transbordo en ${nextTransferStation.name} para tomar ${nextTransferLeg.routeCode}`
                   : `Transbordo en ${nextTransferStation.name}`}
@@ -151,91 +201,143 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderWidth: 1,
+    borderWidth: borders.standard,
     borderColor: colors.border,
     padding: spacing.lg,
     gap: spacing.xs,
   },
   title: {
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: '800',
+    fontSize: 30,
+    lineHeight: 38,
+    fontWeight: '900',
     color: colors.text,
   },
   subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 26,
+    fontWeight: '700',
     color: colors.textMuted,
   },
   listCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderWidth: 1,
+    borderWidth: borders.standard,
     borderColor: colors.border,
     padding: spacing.lg,
     gap: spacing.md,
   },
   busBanner: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.primarySurface,
     borderRadius: radius.md,
+    borderWidth: borders.standard,
+    borderColor: colors.primary,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
   },
   busBannerText: {
-    fontSize: 18,
-    lineHeight: 24,
-    fontWeight: '800',
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '900',
     color: colors.primary,
   },
   statusGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
   },
   statusItem: {
     flex: 1,
+    minWidth: 100,
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.md,
+    borderWidth: borders.standard,
+    borderColor: colors.border,
     padding: spacing.md,
     gap: spacing.xs,
   },
   segmentBlock: {
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   segmentLabel: {
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.textMuted,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   stopRow: {
-    paddingVertical: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    minHeight: 48,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceMuted,
+  },
+  stopRowCurrent: {
+    backgroundColor: colors.primarySurface,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
   },
   stopText: {
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 24,
     color: colors.text,
-    fontWeight: '600',
+    fontWeight: '700',
+    flex: 1,
+  },
+  stopTextBold: {
+    fontSize: 18,
+    lineHeight: 24,
+    color: colors.text,
+    fontWeight: '800',
   },
   stopCurrent: {
+    fontSize: 19,
+    lineHeight: 24,
     color: colors.primary,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   stopDestination: {
+    fontSize: 19,
+    lineHeight: 24,
     color: colors.success,
-    fontWeight: '800',
+    fontWeight: '900',
+  },
+  stopBadgeCurrent: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+  },
+  stopBadgeTextCurrent: {
+    color: colors.textInverse,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  stopBadgeDest: {
+    backgroundColor: colors.success,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+  },
+  stopBadgeTextDest: {
+    color: colors.textInverse,
+    fontSize: 12,
+    fontWeight: '900',
   },
   transferBanner: {
     backgroundColor: colors.warningSoft,
     borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
+    padding: spacing.lg,
+    borderWidth: borders.bold,
     borderColor: colors.warning,
   },
   transferText: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 24,
     color: colors.text,
-    fontWeight: '600',
+    fontWeight: '800',
   },
 });

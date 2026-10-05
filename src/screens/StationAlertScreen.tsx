@@ -8,19 +8,20 @@ import { useDemoMode } from '@/src/context/DemoModeContext';
 import { useRouteSelection } from '@/src/context/RouteContext';
 import { useScreenAnnouncement } from '@/src/hooks/useScreenAnnouncement';
 import { useStopDemoOnBack } from '@/src/hooks/useStopDemoOnBack';
+import { useStopSpeechOnBlur } from '@/src/hooks/useStopSpeechOnBlur';
+import { logDemoEvent } from '@/src/services/demoService';
+import { triggerSuccessHaptic } from '@/src/services/hapticsService';
 import {
   speakAndWait,
   stopSpeaking,
 } from '@/src/services/speechService';
-import { logDemoEvent } from '@/src/services/demoService';
-import { useStopSpeechOnBlur } from '@/src/hooks/useStopSpeechOnBlur';
 import { RootStackParamList } from '@/src/utils/navigation';
-import { colors, radius, spacing } from '@/src/utils/theme';
+import { borders, colors, radius, spacing } from '@/src/utils/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StationAlert'>;
 
 export function StationAlertScreen({ navigation }: Props) {
-  useScreenAnnouncement('Avisos de proximidad. La estacion esta cerca.');
+  useScreenAnnouncement('Aviso de proximidad. Estás muy cerca de la estación.');
   useStopSpeechOnBlur();
   const { demoAutoFlowEnabled, demoRunId, demoState, setDemoStep } = useDemoMode();
   const { tripFinished } = useRouteSelection();
@@ -40,7 +41,8 @@ export function StationAlertScreen({ navigation }: Props) {
         currentStation: demoState.currentStationName,
         nextStation: demoState.nextStationName,
       });
-      await speakAndWait('Vas bien. La estacion esta cerca, sigue recto.', {
+      await triggerSuccessHaptic();
+      await speakAndWait('Vas por buen camino. La estación está al frente, sigue recto.', {
         key: 'demo-station-alert',
         minIntervalMs: 0,
         interrupt: true,
@@ -82,21 +84,39 @@ export function StationAlertScreen({ navigation }: Props) {
 
   return (
     <ScreenContainer>
-      <View style={styles.hero}>
-        <Text accessibilityRole="header" style={styles.title}>
-          Estacion cerca
+      <View
+        accessible={true}
+        accessibilityRole="header"
+        accessibilityLabel="Estación muy cerca. Sigue recto, la entrada principal está al frente."
+        style={styles.hero}>
+        <View style={styles.badgeRow}>
+          <View style={styles.proximityBadge}>
+            <Text style={styles.proximityBadgeText}>PROXIMIDAD</Text>
+          </View>
+        </View>
+        <Text allowFontScaling={true} style={styles.title}>
+          Estación cerca
         </Text>
-        <Text style={styles.subtitle}>Sigue recto. La entrada esta al frente.</Text>
+        <Text allowFontScaling={true} style={styles.subtitle}>
+          Sigue recto por la rampa peatonal. La entrada está al frente.
+        </Text>
       </View>
 
-      <View style={styles.alertCard}>
-        <Text style={styles.alertText}>Cuando llegues, entra por los torniquetes.</Text>
+      <View
+        accessible={true}
+        accessibilityRole="text"
+        accessibilityLabel="Indicación: Cuando llegues a la estación, ingresa por los torniquetes o paso accesible."
+        style={styles.alertCard}>
+        <Text allowFontScaling={true} style={styles.alertText}>
+          Al ingresar a la estación, pasa tu tarjeta TuLlave por el torniquete o puerta accesible.
+        </Text>
       </View>
 
       <AccessibleButton
-        label="Confirmar llegada"
-        hint="Ir a la pantalla de llegada a estacion"
-        accessibilityLabel="Confirmar llegada a la estacion"
+        label="Confirmar llegada a estación"
+        variant="accent"
+        hint="Toca para ingresar y esperar el bus"
+        accessibilityLabel="Confirmar llegada física a la estación"
         onPress={() => navigation.replace('StationArrival')}
       />
     </ScreenContainer>
@@ -106,32 +126,50 @@ export function StationAlertScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   hero: {
     backgroundColor: colors.primary,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    gap: spacing.xs,
+    borderRadius: radius.md,
+    padding: spacing.xl,
+    gap: spacing.sm,
+    borderWidth: borders.standard,
+    borderColor: colors.primaryPressed,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+  },
+  proximityBadge: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.sm,
+  },
+  proximityBadgeText: {
+    color: colors.accentText,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   title: {
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: '800',
-    color: colors.surface,
+    fontSize: 30,
+    lineHeight: 38,
+    fontWeight: '900',
+    color: colors.textInverse,
   },
   subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#FCE9EC',
+    fontSize: 18,
+    lineHeight: 26,
+    color: '#FFE4E6',
+    fontWeight: '700',
   },
   alertCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderWidth: 1,
+    borderWidth: borders.standard,
     borderColor: colors.border,
-    padding: spacing.md,
+    padding: spacing.lg,
   },
   alertText: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 26,
     color: colors.text,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

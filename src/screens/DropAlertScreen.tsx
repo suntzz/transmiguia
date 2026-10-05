@@ -7,16 +7,16 @@ import { AccessibleButton } from '@/src/components/AccessibleButton';
 import { ScreenContainer } from '@/src/components/ScreenContainer';
 import { useDemoMode } from '@/src/context/DemoModeContext';
 import { useRouteSelection } from '@/src/context/RouteContext';
+import { useScreenAnnouncement } from '@/src/hooks/useScreenAnnouncement';
+import { useStopDemoOnBack } from '@/src/hooks/useStopDemoOnBack';
 import { triggerWarningHaptic } from '@/src/services/hapticsService';
 import {
   speakAndWait,
   stopSpeaking,
   waitForSpeechToSettle,
 } from '@/src/services/speechService';
-import { useScreenAnnouncement } from '@/src/hooks/useScreenAnnouncement';
-import { useStopDemoOnBack } from '@/src/hooks/useStopDemoOnBack';
 import { RootStackParamList } from '@/src/utils/navigation';
-import { colors, radius, spacing } from '@/src/utils/theme';
+import { borders, colors, radius, spacing } from '@/src/utils/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DropAlert'>;
 
@@ -25,7 +25,7 @@ export function DropAlertScreen({ navigation }: Props) {
   const { demoAutoFlowEnabled } = useDemoMode();
   useStopDemoOnBack(demoAutoFlowEnabled);
 
-  useScreenAnnouncement('Una parada restante. Prepararse para bajar.');
+  useScreenAnnouncement('Alerta importante: Una parada restante. Prepárate para descender.');
 
   useFocusEffect(
     React.useCallback(() => {
@@ -34,7 +34,7 @@ export function DropAlertScreen({ navigation }: Props) {
       const runDropAlert = async () => {
         await triggerWarningHaptic();
         await speakAndWait(
-          `Preparate, estas cerca de tu parada. La proxima estacion es ${destinationStation.name}.`,
+          `¡Prepárate! Estás cerca de tu parada. La próxima estación es ${destinationStation.name}. Acércate a la puerta con precaución.`,
           {
             key: `prepare-exit-${destinationStation.id}`,
             minIntervalMs: 0,
@@ -67,25 +67,58 @@ export function DropAlertScreen({ navigation }: Props) {
 
   return (
     <ScreenContainer>
-      <View style={styles.counterCard}>
-        <Text style={styles.counter}>1</Text>
-        <Text style={styles.counterLabel}>PARADA RESTANTE</Text>
+      {/* Contador Gigante de Alto Contraste */}
+      <View
+        accessible={true}
+        accessibilityRole="alert"
+        accessibilityLabel={`Atención: Una parada restante para llegar a tu destino ${destinationStation.name}. Prepárate para descender.`}
+        style={styles.counterCard}>
+        <View style={styles.badgeRow}>
+          <View style={styles.alertBadge}>
+            <Text style={styles.alertBadgeText}>AVISO DE BAJADA</Text>
+          </View>
+        </View>
+        <Text allowFontScaling={true} style={styles.counter}>
+          1
+        </Text>
+        <Text allowFontScaling={true} style={styles.counterLabel}>
+          PARADA RESTANTE
+        </Text>
       </View>
 
-      <View style={styles.warningCard}>
-        <Text accessibilityRole="header" style={styles.warningTitle}>
-          Prepararse para bajar
+      {/* Tarjeta de Advertencia */}
+      <View
+        accessible={true}
+        accessibilityRole="text"
+        accessibilityLabel={`Próxima parada: ${destinationStation.name}. Acércate a la puerta con precaución.`}
+        style={styles.warningCard}>
+        <Text allowFontScaling={true} style={styles.warningTitle}>
+          Prepárate para bajar
         </Text>
-        <Text style={styles.warningText}>
-          Proxima parada: {destinationStation.name}. Acercate a la puerta.
+        <Text allowFontScaling={true} style={styles.warningText}>
+          Próxima estación:{' '}
+          <Text style={styles.stationHighlight}>{destinationStation.name}</Text>
+        </Text>
+        <Text allowFontScaling={true} style={styles.warningSubtext}>
+          Acércate a la puerta con precaución y sujeta tus pertenencias.
         </Text>
       </View>
+
+      {/* Acciones */}
+      <AccessibleButton
+        label="Confirmar llegada a estación"
+        variant="accent"
+        hint="Toca cuando el bus se haya detenido en tu estación"
+        accessibilityLabel={`Confirmar que el bus llegó a ${destinationStation.name}`}
+        onPress={() => navigation.replace('Destination')}
+      />
 
       <AccessibleButton
-        label="Confirmar destino final"
-        hint="Ir a la llegada final"
-        accessibilityLabel="Confirmar llegada al destino final"
-        onPress={() => navigation.replace('Destination')}
+        label="Volver al seguimiento"
+        variant="secondary"
+        hint="Regresa a la pantalla de monitoreo del bus"
+        accessibilityLabel="Regresar al seguimiento de paradas"
+        onPress={() => navigation.navigate('BusTracking')}
       />
     </ScreenContainer>
   );
@@ -97,34 +130,65 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.xl,
     alignItems: 'center',
+    borderWidth: borders.standard,
+    borderColor: colors.border,
+    gap: spacing.xs,
+  },
+  badgeRow: {
+    marginBottom: spacing.xs,
+  },
+  alertBadge: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.sm,
+  },
+  alertBadgeText: {
+    color: colors.accentText,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   counter: {
-    fontSize: 84,
-    lineHeight: 88,
-    fontWeight: '800',
-    color: colors.primary,
+    fontSize: 96,
+    lineHeight: 100,
+    fontWeight: '900',
+    color: colors.accent,
   },
   counterLabel: {
-    fontSize: 14,
+    fontSize: 18,
     letterSpacing: 2,
-    color: '#DADADA',
-    fontWeight: '700',
+    color: colors.textInverse,
+    fontWeight: '900',
   },
   warningCard: {
     backgroundColor: colors.warningSoft,
     borderRadius: radius.md,
-    padding: spacing.lg,
-    gap: spacing.xs,
+    padding: spacing.xl,
+    borderWidth: borders.bold,
+    borderColor: colors.warning,
+    gap: spacing.sm,
   },
   warningTitle: {
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '800',
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '900',
     color: colors.warning,
   },
   warningText: {
-    fontSize: 15,
+    fontSize: 20,
+    lineHeight: 28,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  stationHighlight: {
+    fontWeight: '900',
+    color: colors.primary,
+  },
+  warningSubtext: {
+    fontSize: 16,
     lineHeight: 22,
-    color: colors.warning,
+    color: colors.textMuted,
+    fontWeight: '600',
   },
 });
