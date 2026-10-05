@@ -48,6 +48,16 @@ Servicios clave:
 
 ---
 
+## Documentación de Arquitectura y Pruebas
+
+Para una descripción detallada del diseño arquitectónico modular (Clean Architecture) y el proceso de migración:
+
+- 📋 [**Auditoría de Arquitectura y Plan de Migración**](docs/arquitectura_auditoria_y_plan_migracion.md): Diagnóstico técnico de la base de código original, catálogo de dependencias, problemas identificados y plan modular en 5 etapas.
+- 🚀 [**Resumen de Ejecución y Pruebas de la Migración**](docs/resumen_ejecucion_migracion.md): Detalle técnico de las 5 etapas completadas, controladores extraídos, refactorización de pantallas, suite de 28 pruebas unitarias automatizadas y sincronización en GitHub.
+- 📓 **Obsidian**: Los documentos incluyen metadatos YAML, enlaces wiki y diagramas compatibles nativamente con [Obsidian](https://obsidian.md).
+
+---
+
 ## Flujo de navegación
 
 ```text
