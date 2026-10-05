@@ -233,14 +233,17 @@ export function BusTrackingScreen({ navigation }: Props) {
       <View style={styles.actions}>
         <AccessibleButton
           label="Simular aviso de bajada"
+          subtitle="Probar alerta sensorial de 1 parada restante"
           variant="primary"
+          size="large"
           icon="notifications-active"
           hint="Ir a la alerta de una parada restante"
-          accessibilityLabel="Abrir aviso de bajada"
+          accessibilityLabel="Simular aviso de bajada. Probar alerta sensorial de una parada restante."
           onPress={() => navigation.replace('DropAlert')}
         />
         <AccessibleButton
           label="Cambiar destino"
+          subtitle="Modificar la estación de llegada en ruta"
           variant="secondary"
           icon="edit-location"
           hint="Abrir la lista de estaciones disponibles"

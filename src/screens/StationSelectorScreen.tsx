@@ -473,10 +473,11 @@ export function StationSelectorScreen({ navigation }: Props) {
 
       <AccessibleButton
         label="Volver al inicio"
+        subtitle="Regresar a la pantalla principal sin cambiar el flujo"
         variant="secondary"
-        icon={<MaterialIcons name="arrow-back" size={20} color={colors.text} />}
+        icon="arrow-back"
         hint="Regresa a la pantalla principal sin cambiar el flujo"
-        accessibilityLabel="Volver al inicio"
+        accessibilityLabel="Volver al inicio. Regresar a la pantalla principal sin cambiar el flujo."
         onPress={() => navigation.navigate('Home')}
       />
     </ScreenContainer>

@@ -11,6 +11,8 @@ import { BusTrackingScreen } from '@/src/screens/BusTrackingScreen';
 import { DestinationScreen } from '@/src/screens/DestinationScreen';
 import { DropAlertScreen } from '@/src/screens/DropAlertScreen';
 import { HomeScreen } from '@/src/screens/HomeScreen';
+import { OnboardingScreen } from '@/src/screens/OnboardingScreen';
+import { PermissionsScreen } from '@/src/screens/PermissionsScreen';
 import { RoutePreviewScreen } from '@/src/screens/RoutePreviewScreen';
 import { StationSelectorScreen } from '@/src/screens/StationSelectorScreen';
 import { StationAlertScreen } from '@/src/screens/StationAlertScreen';
@@ -81,6 +83,20 @@ export function AppNavigator() {
           options={{
             title: 'TransMilenio Accesible',
             headerShown: false, // The new HomeScreen has a custom, modern accessible header built-in!
+          }}
+        />
+        <Stack.Screen
+          name="Onboarding"
+          component={OnboardingScreen}
+          options={{
+            title: 'Bienvenida',
+          }}
+        />
+        <Stack.Screen
+          name="Permissions"
+          component={PermissionsScreen}
+          options={{
+            title: 'Permisos de Acceso',
           }}
         />
         <Stack.Screen

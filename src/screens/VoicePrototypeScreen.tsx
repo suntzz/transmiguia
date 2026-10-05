@@ -561,6 +561,8 @@ export function VoicePrototypeScreen({ navigation }: Props) {
       {/* Voice Action Hero Button */}
       <AccessibleButton
         label={isListening ? 'Detener escucha' : 'Escuchar destino'}
+        subtitle={isListening ? 'Toca para finalizar la captura de audio' : 'Toca y di el nombre de tu estación'}
+        size="large"
         icon={isListening ? 'stop' : 'mic'}
         variant={isListening ? 'danger' : 'primary'}
         hint="Activa o detiene el reconocimiento de voz"
@@ -718,6 +720,8 @@ export function VoicePrototypeScreen({ navigation }: Props) {
       <View style={styles.footerActions}>
         <AccessibleButton
           label="Continuar con destino detectado"
+          subtitle="Avanzar al resumen y preparación de ruta"
+          size="large"
           icon="arrow-forward"
           variant="primary"
           hint="Abre el resumen de ruta"
@@ -746,10 +750,11 @@ export function VoicePrototypeScreen({ navigation }: Props) {
 
         <AccessibleButton
           label="Cambiar destino"
+          subtitle="Explorar estaciones manualmente en la lista"
           variant="secondary"
           icon="list"
           hint="Abrir lista de estaciones disponibles"
-          accessibilityLabel="Cambiar destino manualmente"
+          accessibilityLabel="Cambiar destino manualmente. Explorar estaciones en la lista."
           onPress={() => {
             navigation.navigate('StationSelector');
           }}

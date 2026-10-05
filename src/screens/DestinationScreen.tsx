@@ -137,6 +137,7 @@ export function DestinationScreen({ navigation, route }: Props) {
           label="Comenzar un nuevo viaje"
           subtitle="Regresar a la pantalla de inicio"
           variant="primary"
+          size="large"
           icon="refresh"
           hint="Toca para reiniciar el flujo y planear otro recorrido"
           accessibilityLabel="Comenzar un nuevo viaje. Regresa al inicio."

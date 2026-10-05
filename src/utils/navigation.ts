@@ -1,5 +1,7 @@
 export type RootStackParamList = {
   Home: undefined;
+  Onboarding: undefined;
+  Permissions: undefined;
   StationSelector: undefined;
   VoicePrototype: undefined;
   RoutePreview: undefined;

@@ -131,10 +131,12 @@ export function StationAlertScreen({ navigation }: Props) {
       <View style={styles.actionContainer}>
         <AccessibleButton
           label="Confirmar llegada a estación"
+          subtitle="Ingresar a la plataforma para esperar el bus"
           variant="primary"
+          size="large"
           icon="check-circle"
           hint="Toca para ingresar y esperar el bus"
-          accessibilityLabel="Confirmar llegada física a la estación"
+          accessibilityLabel="Confirmar llegada física a la estación. Ingresar a la plataforma para esperar el bus."
           onPress={() => navigation.replace('StationArrival')}
         />
       </View>

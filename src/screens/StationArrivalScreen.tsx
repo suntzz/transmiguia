@@ -267,8 +267,14 @@ export function StationArrivalScreen({ navigation }: Props) {
       <View style={styles.actions}>
         <AccessibleButton
           label={busReady ? 'Abordar ahora' : 'Esperando el bus'}
+          subtitle={
+            busReady
+              ? 'Vehículo en plataforma con puertas abiertas'
+              : 'Te avisaremos cuando el bus se detenga y abra puertas'
+          }
           icon={busReady ? 'login' : 'schedule'}
           variant={busReady ? 'primary' : 'secondary'}
+          size="large"
           hint={
             busReady
               ? 'Continuar al seguimiento de paradas'
@@ -281,6 +287,7 @@ export function StationArrivalScreen({ navigation }: Props) {
         {busReady && firstLeg ? (
           <AccessibleButton
             label="Este no es mi bus"
+            subtitle="Pedir asistencia para esperar el vehículo correcto"
             variant="ghost"
             icon="help-outline"
             hint="Pedir ayuda para esperar el bus correcto"

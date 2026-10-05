@@ -175,10 +175,30 @@ export function RoutePreviewScreen({ navigation }: Props) {
         {/* Action Controls */}
         <View style={styles.actionGroup}>
           <AccessibleButton
+            label="Iniciar Guía Peatonal"
+            subtitle="Comenzar orientación paso a paso hacia la estación"
+            variant="primary"
+            size="large"
+            icon="directions-walk"
+            hint="Inicia la navegación peatonal asistida de inmediato"
+            accessibilityLabel="Iniciar Guía Peatonal. Comenzar orientación paso a paso."
+            onPress={() => {
+              if (advanceTimeoutRef.current) {
+                clearTimeout(advanceTimeoutRef.current);
+                advanceTimeoutRef.current = null;
+              }
+              void stopSpeaking();
+              advanceToWalking();
+            }}
+          />
+
+          <AccessibleButton
             label="Cambiar destino"
+            subtitle="Elegir otra estación del catálogo"
             variant="secondary"
-            icon={<MaterialIcons name="edit-location" size={20} color={colors.text} />}
-            hint="Abrir la lista de estaciones"
+            icon="edit-location"
+            hint="Abrir la lista de estaciones disponibles"
+            accessibilityLabel="Cambiar destino. Elegir otra estación del catálogo."
             onPress={() => {
               void stopSpeaking();
               navigation.navigate('StationSelector');
@@ -187,9 +207,11 @@ export function RoutePreviewScreen({ navigation }: Props) {
 
           <AccessibleButton
             label="Reiniciar demo"
+            subtitle="Volver al inicio de la simulación"
             variant="secondary"
-            icon={<MaterialIcons name="replay" size={20} color={colors.text} />}
+            icon="replay"
             hint="Reinicia la demostración desde el inicio"
+            accessibilityLabel="Reiniciar demostración"
             onPress={() => {
               if (advanceTimeoutRef.current) {
                 clearTimeout(advanceTimeoutRef.current);
@@ -204,8 +226,9 @@ export function RoutePreviewScreen({ navigation }: Props) {
           <AccessibleButton
             label="Detener demo"
             variant="ghost"
-            icon={<MaterialIcons name="close" size={20} color={colors.primary} />}
-            hint="Detiene la demostración y vuelve al inicio"
+            icon="close"
+            hint="Detiene la demostración y vuelve a la pantalla principal"
+            accessibilityLabel="Detener demostración"
             onPress={() => {
               if (advanceTimeoutRef.current) {
                 clearTimeout(advanceTimeoutRef.current);

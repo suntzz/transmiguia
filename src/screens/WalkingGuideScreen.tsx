@@ -109,25 +109,29 @@ export function WalkingGuideScreen({ navigation }: Props) {
         </View>
       </View>
 
-      {/* Repeat Voice Feedback Button (Essential for visual impairment) */}
-      <AccessibleButton
-        label="Repetir indicación por voz"
-        variant="accent"
-        size="large"
-        icon={<MaterialIcons name="volume-up" size={22} color={colors.accentText} />}
-        hint="Vuelve a escuchar la última instrucción de orientación"
-        accessibilityLabel="Repetir indicación de caminata por voz"
-        onPress={handleRepeatVoice}
-      />
+      {/* Action Controls */}
+      <View style={styles.actionGroup}>
+        <AccessibleButton
+          label="Repetir indicación por voz"
+          subtitle="Escuchar la última instrucción de orientación"
+          variant="accent"
+          size="large"
+          icon="volume-up"
+          hint="Vuelve a escuchar la última instrucción de orientación"
+          accessibilityLabel="Repetir indicación de caminata por voz"
+          onPress={handleRepeatVoice}
+        />
 
-      <AccessibleButton
-        label="Cambiar destino"
-        variant="secondary"
-        icon={<MaterialIcons name="edit-location" size={20} color={colors.text} />}
-        hint="Abrir la lista de estaciones"
-        accessibilityLabel="Cambiar destino de la caminata"
-        onPress={() => navigation.navigate('StationSelector')}
-      />
+        <AccessibleButton
+          label="Cambiar destino"
+          subtitle="Seleccionar otra estación de llegada"
+          variant="secondary"
+          icon="edit-location"
+          hint="Abrir la lista de estaciones disponibles"
+          accessibilityLabel="Cambiar destino de la caminata"
+          onPress={() => navigation.navigate('StationSelector')}
+        />
+      </View>
     </ScreenContainer>
   );
 }
@@ -208,5 +212,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     color: colors.textSecondary,
+  },
+  actionGroup: {
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
 });

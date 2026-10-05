@@ -126,15 +126,18 @@ export function DropAlertScreen({ navigation }: Props) {
       <View style={styles.actions}>
         <AccessibleButton
           label="Confirmar llegada a estación"
+          subtitle={`El bus se ha detenido en ${destinationStation.name}`}
           variant="primary"
+          size="large"
           icon="check-circle"
           hint="Toca cuando el bus se haya detenido en tu estación"
-          accessibilityLabel={`Confirmar que el bus llegó a ${destinationStation.name}`}
+          accessibilityLabel={`Confirmar que el bus llegó a ${destinationStation.name}. Descender con precaución.`}
           onPress={() => navigation.replace('Destination')}
         />
 
         <AccessibleButton
           label="Volver al seguimiento"
+          subtitle="Regresar a la lista de paradas en curso"
           variant="secondary"
           icon="arrow-back"
           hint="Regresa a la pantalla de monitoreo del bus"

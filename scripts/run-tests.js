@@ -401,6 +401,8 @@ async function runAllSuites() {
 
     // Screens
     const { HomeScreen } = require('@/src/screens/HomeScreen.tsx');
+    const { OnboardingScreen } = require('@/src/screens/OnboardingScreen.tsx');
+    const { PermissionsScreen } = require('@/src/screens/PermissionsScreen.tsx');
     const { StationSelectorScreen } = require('@/src/screens/StationSelectorScreen.tsx');
     const { DestinationScreen } = require('@/src/screens/DestinationScreen.tsx');
     const { RoutePreviewScreen } = require('@/src/screens/RoutePreviewScreen.tsx');
@@ -564,6 +566,23 @@ async function runAllSuites() {
       assert(markup.includes('Escuchar destino') || markup.includes('Detener escucha'), 'Debe tener boton de voz');
       assert(markup.includes('Escribir destino manualmente'), 'Debe ofrecer seccion manual accesible');
       assert(markup.includes('Usar texto escrito'), 'Debe permitir confirmar texto manual');
+    });
+
+    test('OnboardingScreen: Renderiza bienvenida accesible, tres pilares sensoriales y acciones', () => {
+      const markup = renderScreen(OnboardingScreen);
+      assert(markup.includes('TRANSMILENIO ACCESIBLE'), 'Debe incluir titulo de marca');
+      assert(markup.includes('Tu guía de viaje accesible'), 'Debe contener encabezado de bienvenida');
+      assert(markup.includes('Guía por Voz'), 'Debe listar pilar de voz');
+      assert(markup.includes('Alertas por Vibración'), 'Debe listar pilar de vibracion');
+      assert(markup.includes('Configurar Permisos'), 'Debe tener boton hacia permisos');
+    });
+
+    test('PermissionsScreen: Renderiza estado de permisos GPS, Microfono y Hapticos', () => {
+      const markup = renderScreen(PermissionsScreen);
+      assert(markup.includes('Permisos de la Aplicación'), 'Debe incluir titulo');
+      assert(markup.includes('Ubicación GPS en tiempo real'), 'Debe incluir permiso de ubicacion');
+      assert(markup.includes('Micrófono y Reconocimiento de Voz'), 'Debe incluir permiso de microfono');
+      assert(markup.includes('Conceder Permisos') || markup.includes('Todo Listo para Navegar'), 'Debe tener accion de permisos');
     });
   });
 
