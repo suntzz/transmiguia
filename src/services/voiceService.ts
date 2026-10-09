@@ -5,6 +5,9 @@ import {
 
 export type VoiceServiceCallbacks = {
   onStart?: () => void;
+  onAudioStart?: () => void;
+  onSpeechStart?: () => void;
+  onSpeechEnd?: () => void;
   onEnd?: () => void;
   onResults?: (text: string) => void;
   onPartialResults?: (text: string) => void;
@@ -269,7 +272,6 @@ async function selectRecognitionCandidate(
     typeof defaultService?.packageName === 'string' ? defaultService.packageName : '';
   const servicePriority = dedupeCaseInsensitive([
     defaultServicePackage,
-    'com.google.android.tts',
     'com.google.android.googlequicksearchbox',
     'com.google.android.as',
   ]).filter((servicePackage) => availableServices.includes(servicePackage));
@@ -398,19 +400,23 @@ export async function configureVoiceRecognition(callbacks: VoiceServiceCallbacks
     activeListeners.push(
       ExpoSpeechRecognitionModule.addListener('audiostart', (event) => {
         logVoice('VOICE AUDIO START', event);
+        callbacks.onAudioStart?.();
       })
     );
 
     activeListeners.push(
       ExpoSpeechRecognitionModule.addListener('speechstart', (event) => {
         speechDetected = true;
+        clearNoResultsWatchdog();
         logVoice('VOICE RECOGNIZED', event);
+        callbacks.onSpeechStart?.();
       })
     );
 
     activeListeners.push(
       ExpoSpeechRecognitionModule.addListener('speechend', (event) => {
         logVoice('VOICE SPEECH END', event);
+        callbacks.onSpeechEnd?.();
       })
     );
 
@@ -566,8 +572,8 @@ export async function startVoiceRecognition(
     androidIntentOptions: {
       EXTRA_LANGUAGE_MODEL: 'web_search',
       EXTRA_PARTIAL_RESULTS: true,
-      EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 1500,
-      EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 1200,
+      EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 2200,
+      EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 1600,
     },
   };
 

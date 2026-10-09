@@ -7,7 +7,7 @@ import type {
 
 const DEFAULT_OPTIONS: Speech.SpeechOptions = {
   language: 'es-CO',
-  rate: 0.98,
+  rate: 0.95,
   pitch: 1,
 };
 
@@ -43,7 +43,6 @@ export class ExpoSpeechTTSGateway implements ITTSGateway {
     if (typeof __DEV__ === 'undefined' || !__DEV__) {
       return;
     }
-
 
     if (details) {
       console.info('[SpeechGateway]', message, details);
@@ -86,8 +85,9 @@ export class ExpoSpeechTTSGateway implements ITTSGateway {
   }
 
   private estimateSpeechDuration(message: string): number {
-    const estimatedDurationMs = message.trim().length * 82;
-    return Math.min(15000, Math.max(2800, estimatedDurationMs));
+    const wordCount = message.trim().split(/\s+/).length;
+    // Generous timeout (16s min) to ensure onDone callback always fires first in normal conditions
+    return Math.max(16000, wordCount * 1200 + 8000);
   }
 
   private async speakWithPause(
@@ -148,17 +148,23 @@ export class ExpoSpeechTTSGateway implements ITTSGateway {
           });
         }
 
-
         finish();
       }, this.estimateSpeechDuration(message));
 
-      Speech.speak(message, {
-        ...DEFAULT_OPTIONS,
-        ...this.defaultOptions,
-        onDone: finish,
-        onStopped: finish,
-        onError: finish,
-      });
+      try {
+        Speech.speak(message, {
+          ...DEFAULT_OPTIONS,
+          ...this.defaultOptions,
+          onDone: finish,
+          onStopped: finish,
+          onError: finish,
+        });
+      } catch (err) {
+        if (typeof __DEV__ !== 'undefined' && __DEV__) {
+          console.warn('[SpeechGateway] Error al invocar Speech.speak', err);
+        }
+        finish();
+      }
     });
 
     return generation === this.speechGeneration;
@@ -241,14 +247,12 @@ export class ExpoSpeechTTSGateway implements ITTSGateway {
     this.isSpeakingInternal = false;
 
     try {
-      const currentlySpeaking = await Speech.isSpeakingAsync();
-      if (currentlySpeaking) {
-        Speech.stop();
-      }
+      Speech.stop();
     } catch (err) {
-      if (typeof __DEV__ !== 'undefined' && __DEV__) console.warn('[SpeechGateway] Error stopping speech', err);
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.warn('[SpeechGateway] Error stopping speech', err);
+      }
     }
-
 
     this.speechQueue = Promise.resolve(false);
     this.lastSpeechFinishedAt = Date.now();

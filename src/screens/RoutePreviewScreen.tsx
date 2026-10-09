@@ -74,15 +74,7 @@ export function RoutePreviewScreen({ navigation }: Props) {
 
       setOriginStation(preparedJourney.originStation);
 
-      advanceTimeoutRef.current = setTimeout(() => {
-        if (cancelled) {
-          return;
-        }
-
-        advanceToWalking();
-      }, 1500);
-
-      void speakAndWait(
+      await speakAndWait(
         `Destino confirmado: ${destinationStation.name}. Iniciare la caminata hacia ${preparedJourney.originStation.name}.`,
         {
           key: `route-preview-${destinationStation.id}`,
@@ -91,6 +83,12 @@ export function RoutePreviewScreen({ navigation }: Props) {
           pauseMs: 600,
         }
       );
+
+      if (cancelled) {
+        return;
+      }
+
+      advanceToWalking();
 
       if (cancelled) {
         return;

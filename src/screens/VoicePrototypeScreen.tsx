@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  Animated,
+  Easing,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -9,20 +17,13 @@ import { useDemoMode } from '@/src/context/DemoModeContext';
 import { useRouteSelection } from '@/src/context/RouteContext';
 import {
   triggerMediumImpactHaptic,
-  triggerSelectionHaptic,
   triggerSuccessHaptic,
   triggerWarningHaptic,
 } from '@/src/services/hapticsService';
 import {
   speakAndWait,
-  speakDestinationConfirmationPrompt,
-  speakDestinationConfirmed,
-  speakDestinationOptions,
   speakManagedText,
-  speakVoiceError,
   stopSpeaking,
-  waitForNarrationPause,
-  waitForSpeechToSettle,
 } from '@/src/services/speechService';
 import {
   TransmilenioStation,
@@ -47,27 +48,18 @@ import { borders, colors, radius, shadows, spacing, typography } from '@/src/uti
 
 type Props = NativeStackScreenProps<RootStackParamList, 'VoicePrototype'>;
 
-function getStationResolutionMessage(
-  transcript: string,
-  result: ReturnType<typeof resolveStationFromSpeech>
-) {
-  if (result.reason === 'ambiguous') {
-    const suggestions = result.candidates
-      ?.slice(0, 2)
-      .map((station) => station.name)
-      .join(' o ');
-
-    return suggestions
-      ? `No quedó claro si dijiste ${suggestions}. Di el nombre completo o escríbelo manualmente.`
-      : 'No quedó clara la estación. Di el nombre completo o escríbelo manualmente.';
-  }
-
-  if (transcript.trim()) {
-    return 'No se reconoció una estación válida. Intenta decir el nombre exacto o escríbelo manualmente.';
-  }
-
-  return 'No se detectó una estación válida. Intenta de nuevo o escribe el destino manualmente.';
-}
+type VoiceFlowState =
+  | 'INITIAL'
+  | 'ANNOUNCING_PROMPT'
+  | 'LISTENING'
+  | 'USER_SPEAKING'
+  | 'PROCESSING'
+  | 'SUCCESS'
+  | 'CONFIRMATION_PENDING'
+  | 'NO_SPEECH'
+  | 'NOT_RECOGNIZED'
+  | 'PERMISSION_DENIED'
+  | 'ENGINE_UNAVAILABLE';
 
 export function VoicePrototypeScreen({ navigation }: Props) {
   const {
@@ -76,610 +68,564 @@ export function VoicePrototypeScreen({ navigation }: Props) {
     setOriginStation,
     setDestinationStation,
   } = useRouteSelection();
+
   const {
     demoModeEnabled,
-    demoAutoFlowEnabled,
-    demoRunId,
-    demoVoiceTranscript,
-    activateDemoAutoFlow,
     prepareDemoJourney,
     setDemoStep,
   } = useDemoMode();
-  const [isListening, setIsListening] = useState(false);
+
+  const [flowState, setFlowState] = useState<VoiceFlowState>('INITIAL');
   const [transcript, setTranscript] = useState('');
   const [partialTranscript, setPartialTranscript] = useState('');
   const [manualInput, setManualInput] = useState('');
-  const [voiceError, setVoiceError] = useState<string | null>(null);
-  const [selectionMessage, setSelectionMessage] = useState<string | null>(null);
-  const [voiceAvailable, setVoiceAvailable] = useState<boolean | null>(null);
-  const [isResolvingDestination, setIsResolvingDestination] = useState(false);
-  const [pendingStation, setPendingStation] = useState<TransmilenioStation | null>(null);
-  const [suggestedStations, setSuggestedStations] = useState<TransmilenioStation[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [recognizedStation, setRecognizedStation] = useState<TransmilenioStation | null>(null);
+  const [candidateStations, setCandidateStations] = useState<TransmilenioStation[]>([]);
+  const [reducedMotion, setReducedMotion] = useState(false);
 
-  useScreenAnnouncement(
-    'Destino por voz. Puedes decir una estación de TransMilenio.'
-  );
+  useScreenAnnouncement('Destino por voz. Puedes decir una estación de TransMilenio.');
   useStopDemoOnBack();
 
-  // Ref so the voice setup effect doesn't re-run when the callback changes
-  const applyTranscriptRef = useRef<((text: string) => Promise<boolean>) | null>(null);
-  const isHandlingDestinationRef = useRef(false);
-  const hasNavigatedRef = useRef(false);
-  const demoPromptStartedRef = useRef(false);
-  const stationVoiceContext = useRef(getAllStationSpeechTerms());
-  const latestTranscriptRef = useRef('');
-  const latestPartialTranscriptRef = useRef('');
-  const lastVoiceErrorRef = useRef<string | null>(null);
+  // Pulse animation for subtle listening indicator (GPU accelerated transform & opacity)
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
 
+  // Lifecycle & guard refs
+  const isMountedRef = useRef(true);
+  const hasNavigatedRef = useRef(false);
+  const isProcessingRef = useRef(false);
+  const stationVoiceContext = useRef(getAllStationSpeechTerms());
+
+  // Check reduced motion setting
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (isMountedRef.current) {
+        setReducedMotion(Boolean(enabled));
+      }
+    });
+
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', (enabled) => {
+      if (isMountedRef.current) {
+        setReducedMotion(Boolean(enabled));
+      }
+    });
+
+    return () => {
+      sub?.remove();
+    };
+  }, []);
+
+  // Subtle pulse animation loop when listening
+  useEffect(() => {
+    if (flowState === 'LISTENING' || flowState === 'USER_SPEAKING') {
+      if (reducedMotion) {
+        pulseAnim.setValue(0);
+        return;
+      }
+
+      pulseAnim.setValue(0);
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1200,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulseAnimationRef.current = loop;
+      loop.start();
+    } else {
+      pulseAnimationRef.current?.stop();
+      pulseAnim.setValue(0);
+    }
+
+    return () => {
+      pulseAnimationRef.current?.stop();
+    };
+  }, [flowState, pulseAnim, reducedMotion]);
+
+  // Initial station statuses refresh
   useEffect(() => {
     void refreshStationStatuses();
   }, []);
 
-  useEffect(() => {
-    latestTranscriptRef.current = transcript;
-  }, [transcript]);
-
-  useEffect(() => {
-    latestPartialTranscriptRef.current = partialTranscript;
-  }, [partialTranscript]);
-
-  useEffect(() => {
-    lastVoiceErrorRef.current = voiceError;
-  }, [voiceError]);
-
-  const continueDemoFlow = useCallback(async () => {
-    if (!demoModeEnabled || hasNavigatedRef.current) {
-      return;
-    }
-
-    if (!demoAutoFlowEnabled) {
-      activateDemoAutoFlow();
-    }
-
-    hasNavigatedRef.current = true;
-    setDemoStep('preview');
-    await waitForSpeechToSettle(2000);
-    navigation.replace('RoutePreview');
-  }, [activateDemoAutoFlow, demoAutoFlowEnabled, demoModeEnabled, navigation, setDemoStep]);
-
-  const clearVoiceResolutionState = useCallback(() => {
-    setPendingStation(null);
-    setSuggestedStations([]);
-    setSelectionMessage(null);
-  }, []);
-
-  const confirmDestinationSelection = useCallback(async (
-    station: TransmilenioStation,
-    options?: { fromRedirectMessage?: string | null; autoContinue?: boolean }
-  ) => {
-    setDestinationStation(station);
-    setPendingStation(null);
-    setSuggestedStations([]);
-    setVoiceError(null);
-    setSelectionMessage(options?.fromRedirectMessage ?? null);
-    setIsResolvingDestination(false);
-
-    if (demoModeEnabled) {
-      const journey = prepareDemoJourney(station);
-
-      if (!journey) {
-        setVoiceError('No pude preparar la demostración con ese destino.');
-        isHandlingDestinationRef.current = false;
-        await triggerWarningHaptic();
-        await speakVoiceError();
+  // Safe navigation helper: awaits TTS completion before advancing
+  const navigateToRoutePreview = useCallback(
+    async (station: TransmilenioStation) => {
+      if (hasNavigatedRef.current || !isMountedRef.current) {
         return;
       }
 
-      setOriginStation(journey.originStation);
-    }
+      hasNavigatedRef.current = true;
+      setDestinationStation(station);
 
-    if (options?.fromRedirectMessage) {
-      await triggerWarningHaptic();
-    } else {
-      await triggerSuccessHaptic();
-    }
-
-    await speakDestinationConfirmed(station.name);
-
-    isHandlingDestinationRef.current = false;
-
-    if (options?.autoContinue && demoAutoFlowEnabled) {
-      await continueDemoFlow();
-    }
-  }, [
-    continueDemoFlow,
-    demoModeEnabled,
-    demoAutoFlowEnabled,
-    prepareDemoJourney,
-    setDestinationStation,
-    setOriginStation,
-  ]);
-
-  const prepareDestinationConfirmation = useCallback(async (
-    station: TransmilenioStation,
-    options?: { redirectMessage?: string | null; autoContinue?: boolean }
-  ) => {
-    setPendingStation(station);
-    setSuggestedStations([]);
-    setSelectionMessage(options?.redirectMessage ?? null);
-    setVoiceError(null);
-    await triggerSelectionHaptic();
-    await speakDestinationConfirmationPrompt(station.name);
-
-    if (options?.autoContinue) {
-      await waitForNarrationPause(800);
-      await confirmDestinationSelection(station, {
-        fromRedirectMessage: options?.redirectMessage ?? null,
-        autoContinue: true,
-      });
-    }
-  }, [confirmDestinationSelection]);
-
-  const applyTranscriptToDestination = useCallback(async (nextText: string) => {
-    setManualInput(nextText);
-    clearVoiceResolutionState();
-
-    if (isHandlingDestinationRef.current) {
-      return false;
-    }
-
-    isHandlingDestinationRef.current = true;
-    setIsResolvingDestination(true);
-
-    const match = resolveStationFromSpeech(nextText);
-
-    if (!match.station) {
-      const message =
-        match.reason === 'empty'
-          ? 'No te escuché bien, intenta otra vez.'
-          : getStationResolutionMessage(nextText, match);
-      setVoiceError(message);
-      setSuggestedStations(match.candidates?.slice(0, 3) ?? []);
-      setIsResolvingDestination(false);
-      isHandlingDestinationRef.current = false;
-      if ((match.candidates?.length ?? 0) > 0) {
-        await speakDestinationOptions(
-          (match.candidates ?? []).slice(0, 3).map((station) => station.name)
-        );
-      } else {
-        await speakVoiceError();
+      if (demoModeEnabled) {
+        const journey = prepareDemoJourney(station);
+        if (journey) {
+          setOriginStation(journey.originStation);
+        }
+        setDemoStep('preview');
       }
-      await triggerWarningHaptic();
-      return false;
-    }
 
-    await stopVoiceRecognition();
-    setIsListening(false);
-    const availability = resolveStationAvailability(match.station);
+      // Final screen replacement after speech has completely finished
+      navigation.replace('RoutePreview');
+    },
+    [demoModeEnabled, navigation, prepareDemoJourney, setDemoStep, setDestinationStation, setOriginStation]
+  );
 
-    if (!availability) {
-      const message = 'No fue posible validar la disponibilidad de esa estación.';
-      setVoiceError(message);
-      setIsResolvingDestination(false);
-      isHandlingDestinationRef.current = false;
-      await speakAndWait(message, {
-        key: `voice-availability-error-${nextText.trim().toLowerCase()}`,
-        minIntervalMs: 0,
+  // Handle destination match result and execute the confirmation speech
+  const handleMatchedDestination = useCallback(
+    async (station: TransmilenioStation) => {
+      if (isProcessingRef.current || hasNavigatedRef.current) {
+        return;
+      }
+      isProcessingRef.current = true;
+
+      // Stop recognition completely
+      await stopVoiceRecognition();
+
+      // Check station availability (maintenance / temporary closures)
+      const availability = resolveStationAvailability(station);
+      const targetStation = availability?.resolvedStation ?? station;
+
+      setRecognizedStation(targetStation);
+      setFlowState('SUCCESS');
+      await triggerSuccessHaptic();
+
+      // Formulate natural, conversational spoken confirmation
+      const confirmationSpeech = availability?.wasRedirected
+        ? `${availability.message} Preparando tu ruta.`
+        : `Entendí ${targetStation.name}. Preparando tu ruta.`;
+
+      // CRITICAL: Strictly await the Text-to-Speech completion callback (onDone)
+      // The screen will NOT navigate until the phone has finished speaking every word!
+      await speakAndWait(confirmationSpeech, {
+        key: `voice-confirm-${targetStation.id}`,
         interrupt: true,
-        pauseMs: 800,
+        pauseMs: 300,
+        ignoreGlobalCooldown: true,
       });
-      await triggerWarningHaptic();
-      return false;
-    }
 
-    setTranscript(match.transcript);
-    setManualInput(availability.resolvedStation.name);
-    const shouldAutoConfirmInDemo =
-      demoModeEnabled &&
-      !availability.wasRedirected &&
-      (match.reason === 'exact' || match.reason === 'fuzzy');
+      if (!isMountedRef.current) {
+        return;
+      }
 
-    if (shouldAutoConfirmInDemo) {
-      await confirmDestinationSelection(availability.resolvedStation, {
-        autoContinue: true,
-      });
-      return true;
-    }
+      // Navigate ONLY after speech has genuinely completed
+      await navigateToRoutePreview(targetStation);
+    },
+    [navigateToRoutePreview]
+  );
 
-    await prepareDestinationConfirmation(availability.resolvedStation, {
-      redirectMessage: availability.wasRedirected ? availability.message : null,
-      autoContinue: demoAutoFlowEnabled,
-    });
-    return true;
-  }, [
-    clearVoiceResolutionState,
-    confirmDestinationSelection,
-    demoModeEnabled,
-    demoAutoFlowEnabled,
-    prepareDestinationConfirmation,
-  ]);
+  // Interpret speech transcript from real microphone
+  const processRecognizedSpeech = useCallback(
+    async (heardText: string) => {
+      if (!heardText.trim()) {
+        setFlowState('NO_SPEECH');
+        setErrorMessage('No te escuché bien. Di el nombre de tu estación.');
+        await triggerWarningHaptic();
+        await speakAndWait('No te escuché bien. Di el nombre de tu estación.', {
+          key: 'voice-no-speech',
+          interrupt: true,
+          pauseMs: 400,
+          ignoreGlobalCooldown: true,
+        });
+        return;
+      }
 
-  // Keep ref up-to-date without re-triggering the voice setup effect
-  useEffect(() => {
-    applyTranscriptRef.current = applyTranscriptToDestination;
-  }, [applyTranscriptToDestination]);
+      setFlowState('PROCESSING');
+      setTranscript(heardText);
+      setManualInput(heardText);
 
-  // Configure Voice ONCE on mount; use ref for callbacks to avoid session destruction
-  useEffect(() => {
-    const setupVoice = async () => {
-      await configureVoiceRecognition({
-        onStart: () => {
-          setIsListening(true);
-          setVoiceError(null);
-          clearVoiceResolutionState();
-          setTranscript('');
-          setPartialTranscript('');
-          setManualInput('');
-          setIsResolvingDestination(false);
-          isHandlingDestinationRef.current = false;
-        },
-        onEnd: () => {
-          setIsListening(false);
-          if (
-            !latestPartialTranscriptRef.current.trim() &&
-            !latestTranscriptRef.current.trim() &&
-            !lastVoiceErrorRef.current
-          ) {
-            const message = 'No te escuché bien, intenta otra vez.';
-            setVoiceError(message);
-            void triggerWarningHaptic();
-            void speakVoiceError();
-          }
-        },
-        onPartialResults: (text) => {
-          setPartialTranscript(text);
-        },
-        onResults: (text) => {
-          setTranscript(text);
-          setPartialTranscript('');
-          setManualInput(text);
-          void applyTranscriptRef.current?.(text);
-        },
-        onError: (error, message) => {
-          setIsListening(false);
-          const normalized = normalizeVoiceErrorMessage(error, message);
-          setVoiceError(normalized);
+      const match = resolveStationFromSpeech(heardText);
 
-          void speakManagedText(normalized, {
-            key: `voice-runtime-error-${normalized}`,
-            minIntervalMs: 6000,
+      if (match.station) {
+        // Successful station match
+        await handleMatchedDestination(match.station);
+      } else if (match.reason === 'ambiguous' && match.candidates && match.candidates.length > 0) {
+        // Multiple candidate stations found
+        setCandidateStations(match.candidates.slice(0, 3));
+        setFlowState('CONFIRMATION_PENDING');
+        await triggerWarningHaptic();
+
+        const candidateNames = match.candidates.slice(0, 2).map((s) => s.name).join(' o ');
+        await speakAndWait(`No entendí bien. ¿Te refieres a ${candidateNames}?`, {
+          key: 'voice-ambiguous-prompt',
+          interrupt: true,
+          pauseMs: 500,
+          ignoreGlobalCooldown: true,
+        });
+      } else {
+        // No match found in the TransMilenio catalog
+        setFlowState('NOT_RECOGNIZED');
+        setErrorMessage(`No reconocí la estación "${heardText}". Di el nombre completo o escríbelo abajo.`);
+        await triggerWarningHaptic();
+
+        await speakAndWait(
+          'No reconocí esa estación. Intenta decir el nombre completo o escríbela abajo.',
+          {
+            key: 'voice-unrecognized-station',
             interrupt: true,
-          });
-          void triggerWarningHaptic();
-        },
-      });
+            pauseMs: 500,
+            ignoreGlobalCooldown: true,
+          }
+        );
+      }
+    },
+    [handleMatchedDestination]
+  );
 
-      const available = await isSpeechRecognitionAvailable();
+  // Activate microphone listening
+  const startListeningSession = useCallback(async () => {
+    if (!isMountedRef.current || hasNavigatedRef.current) {
+      return;
+    }
 
-      setVoiceAvailable(available);
-    };
-
-    void setupVoice();
-
-    return () => {
-      setIsListening(false);
-      void destroyVoiceRecognition();
-      void stopSpeaking();
-    };
-  }, [clearVoiceResolutionState]);
-
-  const handleStartListening = useCallback(async () => {
-    setVoiceError(null);
-    clearVoiceResolutionState();
     setTranscript('');
     setPartialTranscript('');
-    setIsResolvingDestination(false);
-    hasNavigatedRef.current = false;
-    isHandlingDestinationRef.current = false;
-    const microphoneGranted = await ensureVoicePermission();
+    setErrorMessage(null);
+    setCandidateStations([]);
+    isProcessingRef.current = false;
 
-    if (!microphoneGranted) {
-      const message =
-        'El permiso de micrófono no fue concedido. Puedes activarlo o escribir el destino manualmente.';
-      setVoiceError(message);
-
-      await speakManagedText(message, {
-        key: 'voice-microphone-permission',
-        minIntervalMs: 4000,
-        interrupt: true,
-      });
+    // Check microphone permission
+    const granted = await ensureVoicePermission();
+    if (!granted) {
+      setFlowState('PERMISSION_DENIED');
+      setErrorMessage('Permiso de micrófono no concedido. Puedes activarlo o escribir tu destino.');
       await triggerWarningHaptic();
+      await speakManagedText(
+        'Permiso de micrófono no concedido. Puedes activarlo o escribir tu destino abajo.',
+        {
+          key: 'voice-permission-denied',
+          interrupt: true,
+          pauseMs: 400,
+        }
+      );
       return;
     }
 
     try {
       await startVoiceRecognition('es-CO', stationVoiceContext.current);
-      setVoiceAvailable(true);
-    } catch (error) {
-      setIsListening(false);
-      const nextError = normalizeVoiceErrorMessage('start-error', String(error));
-      setVoiceError(nextError);
-
-      await speakManagedText(nextError, {
-        key: `voice-start-error-${nextError}`,
-        minIntervalMs: 4000,
-        interrupt: true,
-      });
+      setFlowState('LISTENING');
+      await triggerMediumImpactHaptic();
+    } catch (err) {
+      const normalized = normalizeVoiceErrorMessage('start-error', String(err));
+      setErrorMessage(normalized);
+      setFlowState('NOT_RECOGNIZED');
       await triggerWarningHaptic();
     }
-  }, [clearVoiceResolutionState]);
+  }, []);
 
-  const handleManualApply = async () => {
-    setTranscript(manualInput);
-    setPartialTranscript('');
-    await applyTranscriptToDestination(manualInput);
-  };
+  // Stop active listening
+  const stopListeningSession = useCallback(async () => {
+    try {
+      await stopVoiceRecognition();
+    } catch {
+      // Ignore
+    }
+    if (isMountedRef.current && flowState === 'LISTENING') {
+      setFlowState('INITIAL');
+    }
+  }, [flowState]);
 
+  // Main entry effect: Configures recognition listeners and starts the initial prompt
   useEffect(() => {
-    if (!demoAutoFlowEnabled) {
-      demoPromptStartedRef.current = false;
-      hasNavigatedRef.current = false;
-      return;
-    }
+    isMountedRef.current = true;
+    hasNavigatedRef.current = false;
+    isProcessingRef.current = false;
 
-    if (demoPromptStartedRef.current || !demoVoiceTranscript) {
-      return;
-    }
+    const setupAndPrompt = async () => {
+      // Configure native voice recognition event callbacks
+      await configureVoiceRecognition({
+        onStart: () => {
+          if (isMountedRef.current) {
+            setFlowState('LISTENING');
+            setErrorMessage(null);
+          }
+        },
+        onSpeechStart: () => {
+          if (isMountedRef.current) {
+            setFlowState('USER_SPEAKING');
+          }
+        },
+        onSpeechEnd: () => {
+          if (isMountedRef.current) {
+            setFlowState('PROCESSING');
+          }
+        },
+        onPartialResults: (partial) => {
+          if (isMountedRef.current) {
+            setPartialTranscript(partial);
+            setFlowState('USER_SPEAKING');
+          }
+        },
+        onResults: (finalText) => {
+          if (isMountedRef.current && !hasNavigatedRef.current) {
+            void processRecognizedSpeech(finalText);
+          }
+        },
+        onError: (errCode, rawMessage) => {
+          if (!isMountedRef.current || hasNavigatedRef.current) {
+            return;
+          }
 
-    demoPromptStartedRef.current = true;
-    setDemoStep('voice');
-    let cancelled = false;
+          if (errCode === 'no-speech' || errCode === 'nomatch') {
+            setFlowState('NO_SPEECH');
+            setErrorMessage('No te escuché bien. Toca el botón para hablar de nuevo.');
+            void triggerWarningHaptic();
+            void speakManagedText('No te escuché bien. Di el nombre de tu estación.', {
+              key: 'voice-no-speech-err',
+              interrupt: true,
+              pauseMs: 400,
+            });
+            return;
+          }
 
-    const runDemoVoiceFlow = async () => {
-      setVoiceError(null);
-      clearVoiceResolutionState();
-      setTranscript('');
-      setPartialTranscript('');
-      setManualInput('');
-      await triggerMediumImpactHaptic();
-      await speakAndWait('¿A dónde quieres ir?', {
-        key: 'demo-voice-question',
-        minIntervalMs: 0,
-        interrupt: true,
-        pauseMs: 900,
+          const normalized = normalizeVoiceErrorMessage(errCode, rawMessage);
+          setErrorMessage(normalized);
+          setFlowState('NOT_RECOGNIZED');
+          void triggerWarningHaptic();
+        },
       });
 
-      if (cancelled) {
-        return;
-      }
-
-      setIsListening(true);
-      const words = demoVoiceTranscript.split(/\s+/).filter(Boolean);
-      let currentPartial = '';
-
-      for (const word of words) {
-        if (cancelled) {
-          return;
+      // Verify native speech engine availability
+      const available = await isSpeechRecognitionAvailable();
+      if (!available) {
+        if (isMountedRef.current) {
+          setFlowState('ENGINE_UNAVAILABLE');
+          setErrorMessage('Reconocimiento de voz no disponible. Usa el campo manual.');
         }
-
-        currentPartial = currentPartial ? `${currentPartial} ${word}` : word;
-        setPartialTranscript(currentPartial);
-        await waitForNarrationPause(450);
-      }
-
-      if (cancelled) {
         return;
       }
 
-      setIsListening(false);
-      setPartialTranscript('');
-      setTranscript(demoVoiceTranscript);
-      setManualInput(demoVoiceTranscript);
-      await waitForNarrationPause(500);
-      await applyTranscriptRef.current?.(demoVoiceTranscript);
+      // STEP 1: Announce prompt clearly to the visually impaired user
+      if (isMountedRef.current) {
+        setFlowState('ANNOUNCING_PROMPT');
+      }
+
+      await speakAndWait('¿A qué estación de TransMilenio quieres ir?', {
+        key: 'voice-initial-prompt',
+        interrupt: true,
+        pauseMs: 400,
+        ignoreGlobalCooldown: true,
+      });
+
+      // STEP 2: Only after the spoken announcement completes, activate the real microphone
+      if (isMountedRef.current && !hasNavigatedRef.current) {
+        await startListeningSession();
+      }
     };
 
-    void runDemoVoiceFlow();
+    void setupAndPrompt();
 
     return () => {
-      cancelled = true;
+      isMountedRef.current = false;
+      void destroyVoiceRecognition();
+      void stopSpeaking();
     };
-  }, [
-    clearVoiceResolutionState,
-    demoAutoFlowEnabled,
-    demoRunId,
-    demoVoiceTranscript,
-    setDemoStep,
-  ]);
+  }, [processRecognizedSpeech, startListeningSession]);
 
-  const liveTranscript = partialTranscript || transcript;
+  // Handle manual destination submission
+  const handleManualSubmit = async () => {
+    if (!manualInput.trim()) {
+      return;
+    }
+    await stopListeningSession();
+    await processRecognizedSpeech(manualInput.trim());
+  };
 
-  // During demo, don't show the previous destination while the prompt is active
-  const showStaleDestination = demoAutoFlowEnabled && !transcript && isListening;
-  const currentDestinationLabel = pendingStation
-    ? `Confirmar ${pendingStation.name}`
-    : hasSelectedDestination && !showStaleDestination
-      ? destinationStation.name
-      : isResolvingDestination
-        ? 'Procesando...'
-        : 'Aún sin destino confirmado';
+  const isMicListening = flowState === 'LISTENING' || flowState === 'USER_SPEAKING';
+  const liveDisplayText = partialTranscript || transcript;
+
+  const pulseScale = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.25],
+  });
+
+  const pulseOpacity = pulseAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.7, 0.35, 0],
+  });
 
   return (
     <ScreenContainer>
-      {/* Header and Mic Visual Indicator */}
+      {/* Header with Title and Accessible Context */}
       <View style={styles.header}>
-        <View style={[styles.micIconCircle, isListening && styles.micIconCircleActive]}>
-          <MaterialIcons
-            name={isListening ? 'graphic-eq' : 'mic'}
-            size={36}
-            color={isListening ? colors.primary : colors.textSecondary}
-          />
+        <View style={styles.micContainer}>
+          {isMicListening ? (
+            <Animated.View
+              style={[
+                styles.pulseRing,
+                {
+                  transform: [{ scale: pulseScale }],
+                  opacity: pulseOpacity,
+                },
+              ]}
+            />
+          ) : null}
+
+          <View
+            style={[
+              styles.micIconCircle,
+              isMicListening && styles.micIconCircleActive,
+              flowState === 'SUCCESS' && styles.micIconCircleSuccess,
+              flowState === 'PROCESSING' && styles.micIconCircleProcessing,
+            ]}>
+            <MaterialIcons
+              name={
+                flowState === 'SUCCESS'
+                  ? 'check'
+                  : isMicListening
+                    ? 'graphic-eq'
+                    : flowState === 'PROCESSING'
+                      ? 'hourglass-empty'
+                      : 'mic'
+              }
+              size={36}
+              color={
+                flowState === 'SUCCESS'
+                  ? colors.success
+                  : isMicListening
+                    ? colors.primary
+                    : colors.textSecondary
+              }
+            />
+          </View>
         </View>
+
         <Text accessibilityRole="header" style={styles.title}>
           Decir destino por voz
         </Text>
         <Text style={styles.subtitle}>
-          Di una estación o escríbela si lo prefieres.
+          {flowState === 'ANNOUNCING_PROMPT'
+            ? 'Preparando asistente de voz...'
+            : isMicListening
+              ? 'Te estoy escuchando... Di tu estación'
+              : flowState === 'PROCESSING'
+                ? 'Procesando tu estación...'
+                : flowState === 'SUCCESS'
+                  ? 'Estación confirmada'
+                  : 'Di una estación o escríbela si lo prefieres.'}
         </Text>
       </View>
 
-      {/* Live Voice Assistant Card */}
+      {/* Main Real-Time Voice Card */}
       <View
         accessible={true}
         accessibilityRole="summary"
         accessibilityLabel={
-          isListening
-            ? `Escuchando tu voz. Texto detectado: ${liveTranscript || 'habla ahora'}`
-            : `Voz inactiva. Último texto: ${liveTranscript || 'sin grabación'}`
+          isMicListening
+            ? `Micrófono activo. Te estoy escuchando. Texto detectado: ${liveDisplayText || 'habla ahora'}`
+            : flowState === 'PROCESSING'
+              ? 'Procesando estación dicha'
+              : flowState === 'SUCCESS' && recognizedStation
+                ? `Estación reconocida: ${recognizedStation.name}. Preparando ruta.`
+                : `Asistente de voz inactivo. Último texto: ${liveDisplayText || 'sin grabación'}`
         }
-        style={[styles.liveCard, isListening && styles.liveCardActive]}>
+        style={[
+          styles.liveCard,
+          isMicListening && styles.liveCardActive,
+          flowState === 'SUCCESS' && styles.liveCardSuccess,
+        ]}>
         <View style={styles.liveCardTop}>
           <View style={styles.liveStatusRow}>
-            {isListening ? <View style={styles.recordingDot} /> : null}
-            <Text style={[styles.liveLabel, isListening && styles.liveLabelActive]}>
-              {isListening ? 'Escuchando...' : transcript ? 'Te escuché decir' : 'Di tu destino'}
+            {isMicListening ? <View style={styles.recordingDot} /> : null}
+            <Text
+              style={[
+                styles.liveLabel,
+                isMicListening && styles.liveLabelActive,
+                flowState === 'SUCCESS' && styles.liveLabelSuccess,
+              ]}>
+              {isMicListening
+                ? 'Te estoy escuchando'
+                : flowState === 'PROCESSING'
+                  ? 'Procesando...'
+                  : flowState === 'SUCCESS'
+                    ? 'Te escuché decir'
+                    : transcript
+                      ? 'Último texto detectado'
+                      : 'Asistente de voz'}
             </Text>
           </View>
-          {isListening ? (
+
+          {isMicListening ? (
             <View style={styles.liveBadge}>
               <Text style={styles.liveBadgeText}>Micrófono activo</Text>
+            </View>
+          ) : flowState === 'SUCCESS' ? (
+            <View style={styles.successBadge}>
+              <Text style={styles.successBadgeText}>Confirmado</Text>
             </View>
           ) : null}
         </View>
 
-        <Text style={[styles.liveText, !liveTranscript && styles.transcriptPlaceholder]}>
-          {liveTranscript || '¿A dónde quieres ir?'}
-        </Text>
-      </View>
-
-      {/* Final Recognized Transcript */}
-      <View
-        accessible={true}
-        accessibilityRole="text"
-        accessibilityLabel={`Resultado final reconocido: ${transcript || 'esperando resultado'}`}
-        style={styles.transcriptCard}>
-        <Text style={styles.transcriptLabel}>Resultado final</Text>
         <Text
           style={[
-            styles.transcriptText,
-            !transcript && styles.transcriptPlaceholder,
+            styles.liveText,
+            !liveDisplayText && !recognizedStation && styles.transcriptPlaceholder,
+            flowState === 'SUCCESS' && styles.liveTextSuccess,
           ]}>
-          {transcript || 'Esperando resultado final.'}
+          {flowState === 'SUCCESS' && recognizedStation
+            ? recognizedStation.name
+            : liveDisplayText || (isMicListening ? 'Habla ahora...' : '¿A qué estación quieres ir?')}
         </Text>
+
+        {flowState === 'SUCCESS' ? (
+          <Text style={styles.successHelperText}>
+            Preparando tu ruta... Un momento por favor.
+          </Text>
+        ) : null}
       </View>
 
-      {/* Voice Action Hero Button */}
+      {/* Hero Voice Control Button */}
       <AccessibleButton
-        label={isListening ? 'Detener escucha' : 'Escuchar destino'}
-        subtitle={isListening ? 'Toca para finalizar la captura de audio' : 'Toca y di el nombre de tu estación'}
-        size="large"
-        icon={isListening ? 'stop' : 'mic'}
-        variant={isListening ? 'danger' : 'primary'}
-        hint="Activa o detiene el reconocimiento de voz"
-        accessibilityLabel={
-          isListening
-            ? 'Detener reconocimiento de voz del destino'
-            : 'Iniciar reconocimiento de voz del destino'
+        label={isMicListening ? 'Detener escucha' : 'Escuchar destino'}
+        subtitle={
+          isMicListening
+            ? 'Toca para detener el micrófono'
+            : 'Toca y di el nombre de tu estación'
         }
+        size="large"
+        icon={isMicListening ? 'stop' : 'mic'}
+        variant={isMicListening ? 'danger' : 'primary'}
+        hint="Activa o detiene el reconocimiento de voz por micrófono"
+        accessibilityLabel={
+          isMicListening
+            ? 'Detener escucha del micrófono'
+            : 'Escuchar destino. Activar micrófono'
+        }
+        disabled={flowState === 'PROCESSING' || flowState === 'SUCCESS'}
         onPress={() => {
-          if (isListening) {
-            void stopVoiceRecognition();
-            setIsListening(false);
-            return;
+          if (isMicListening) {
+            void stopListeningSession();
+          } else {
+            void startListeningSession();
           }
-
-          void handleStartListening();
         }}
       />
 
-      {/* Current Destination Status Card */}
-      <View style={styles.statusCard}>
-        <View style={styles.statusHeader}>
-          <MaterialIcons name="place" size={18} color={colors.primary} />
-          <Text style={styles.statusLabel}>Destino actual</Text>
-        </View>
-        <Text style={styles.statusValue}>{currentDestinationLabel}</Text>
-
-        {isListening ? (
-          <View style={styles.statusHelperRow}>
-            <MaterialIcons name="record-voice-over" size={16} color={colors.primary} />
-            <Text style={styles.listeningText}>Escuchando...</Text>
-          </View>
-        ) : null}
-
-        {isResolvingDestination ? (
-          <View style={styles.statusHelperRow}>
-            <MaterialIcons name="sync" size={16} color={colors.primary} />
-            <Text style={styles.listeningText}>Preparando el recorrido...</Text>
-          </View>
-        ) : null}
-
-        {voiceAvailable === false && !demoAutoFlowEnabled ? (
-          <View style={styles.alertNotice}>
-            <MaterialIcons name="warning" size={16} color={colors.warning} />
-            <Text style={styles.warningText}>
-              No hay motor de voz disponible. Usa el campo manual.
-            </Text>
-          </View>
-        ) : null}
-
-        {selectionMessage ? (
-          <View style={styles.alertNotice}>
-            <MaterialIcons name="info" size={16} color={colors.info} />
-            <Text style={styles.infoNoticeText}>{selectionMessage}</Text>
-          </View>
-        ) : null}
-
-        {voiceError ? (
-          <View style={styles.alertNoticeError}>
-            <MaterialIcons name="error-outline" size={16} color={colors.error} />
-            <Text style={styles.errorText}>{voiceError}</Text>
-          </View>
-        ) : null}
-      </View>
-
-      {/* Pending Confirmation Modal / Card */}
-      {pendingStation ? (
-        <View style={styles.confirmationCard}>
-          <View style={styles.confirmationHeader}>
-            <MaterialIcons name="check-circle" size={22} color={colors.success} />
-            <Text style={styles.confirmationLabel}>Confirmar destino</Text>
-          </View>
-          <Text style={styles.confirmationValue}>{pendingStation.name}</Text>
-          <AccessibleButton
-            label="Confirmar destino"
-            icon="check"
-            variant="primary"
-            hint="Aceptar este destino y continuar"
-            onPress={() => {
-              void confirmDestinationSelection(pendingStation, {
-                fromRedirectMessage: selectionMessage,
-                autoContinue: demoModeEnabled,
-              });
-            }}
-          />
-          <AccessibleButton
-            label="Escuchar otra vez"
-            variant="secondary"
-            icon="replay"
-            hint="Volver a escuchar o decir otro destino"
-            onPress={() => {
-              clearVoiceResolutionState();
-              setVoiceError(null);
-              setTranscript('');
-              setPartialTranscript('');
-              void handleStartListening();
-            }}
-          />
-        </View>
-      ) : null}
-
-      {/* Suggested Options */}
-      {!pendingStation && suggestedStations.length > 0 ? (
-        <View style={styles.suggestionsCard}>
-          <Text style={styles.suggestionsTitle}>Opciones cercanas</Text>
-          <View style={styles.suggestionsList}>
-            {suggestedStations.slice(0, 3).map((station) => (
+      {/* Candidate Disambiguation Cards */}
+      {flowState === 'CONFIRMATION_PENDING' && candidateStations.length > 0 ? (
+        <View style={styles.candidatesCard}>
+          <Text style={styles.candidatesTitle}>¿Te refieres a alguna de estas?</Text>
+          <View style={styles.candidatesList}>
+            {candidateStations.map((station) => (
               <AccessibleButton
                 key={station.id}
                 label={station.name}
+                subtitle={`Troncal ${station.troncal}`}
                 variant="secondary"
                 icon="place"
-                hint="Usar esta estación como destino"
+                hint="Seleccionar esta estación como destino"
                 onPress={() => {
-                  void confirmDestinationSelection(station, {
-                    autoContinue: demoModeEnabled,
-                  });
+                  void handleMatchedDestination(station);
                 }}
               />
             ))}
@@ -687,7 +633,34 @@ export function VoicePrototypeScreen({ navigation }: Props) {
         </View>
       ) : null}
 
-      {/* Manual Fallback Input Card */}
+      {/* Error or Silence Notice Banner */}
+      {errorMessage ? (
+        <View
+          accessible={true}
+          accessibilityRole="alert"
+          accessibilityLabel={`Aviso: ${errorMessage}`}
+          style={styles.alertNoticeError}>
+          <MaterialIcons name="info-outline" size={20} color={colors.error} />
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        </View>
+      ) : null}
+
+      {/* Current Destination Status Card */}
+      <View style={styles.statusCard}>
+        <View style={styles.statusHeader}>
+          <MaterialIcons name="place" size={18} color={colors.primary} />
+          <Text style={styles.statusLabel}>Destino actual</Text>
+        </View>
+        <Text style={styles.statusValue}>
+          {recognizedStation
+            ? recognizedStation.name
+            : hasSelectedDestination
+              ? destinationStation.name
+              : 'Aún sin destino confirmado'}
+        </Text>
+      </View>
+
+      {/* Accessible Manual Fallback Section */}
       <View style={styles.manualCard}>
         <View style={styles.manualHeader}>
           <MaterialIcons name="keyboard" size={20} color={colors.textSecondary} />
@@ -695,7 +668,7 @@ export function VoicePrototypeScreen({ navigation }: Props) {
         </View>
         <TextInput
           accessibilityLabel="Campo para escribir la estación destino"
-          accessibilityHint="Escribe una estación y luego activa el botón usar texto escrito"
+          accessibilityHint="Escribe una estación y luego presiona Usar texto escrito"
           autoCapitalize="words"
           autoCorrect={false}
           onChangeText={setManualInput}
@@ -708,53 +681,24 @@ export function VoicePrototypeScreen({ navigation }: Props) {
           label="Usar texto escrito"
           variant="secondary"
           icon="check"
-          hint="Convierte el texto escrito en una estación válida"
+          hint="Valida y confirma el texto escrito como estación destino"
           accessibilityLabel="Usar texto escrito como destino"
+          disabled={!manualInput.trim() || flowState === 'PROCESSING' || flowState === 'SUCCESS'}
           onPress={() => {
-            void handleManualApply();
+            void handleManualSubmit();
           }}
         />
       </View>
 
-      {/* Navigation and Next Actions */}
+      {/* Bottom Navigation Buttons */}
       <View style={styles.footerActions}>
         <AccessibleButton
-          label="Continuar con destino detectado"
-          subtitle="Avanzar al resumen y preparación de ruta"
-          size="large"
-          icon="arrow-forward"
-          variant="primary"
-          hint="Abre el resumen de ruta"
-          disabled={!hasSelectedDestination || isResolvingDestination || Boolean(pendingStation)}
-          onPress={() => {
-            if (!hasSelectedDestination) {
-              void speakManagedText(
-                'Primero di o escribe un destino para iniciar la guía.',
-                {
-                  key: 'voice-missing-destination',
-                  minIntervalMs: 0,
-                  interrupt: true,
-                }
-              );
-              return;
-            }
-
-            if (demoModeEnabled) {
-              void continueDemoFlow();
-              return;
-            }
-
-            navigation.navigate('RoutePreview');
-          }}
-        />
-
-        <AccessibleButton
-          label="Cambiar destino"
-          subtitle="Explorar estaciones manualmente en la lista"
+          label="Seleccionar de la lista"
+          subtitle="Explorar todas las estaciones por troncales"
           variant="secondary"
           icon="list"
-          hint="Abrir lista de estaciones disponibles"
-          accessibilityLabel="Cambiar destino manualmente. Explorar estaciones en la lista."
+          hint="Abre la lista de estaciones de TransMilenio"
+          accessibilityLabel="Seleccionar de la lista. Abrir catálogo completo de estaciones."
           onPress={() => {
             navigation.navigate('StationSelector');
           }}
@@ -770,20 +714,44 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     paddingVertical: spacing.sm,
   },
+  micContainer: {
+    width: 80,
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    marginBottom: spacing.xs,
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
   micIconCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
     backgroundColor: colors.surfaceHover,
-    borderWidth: 1,
+    borderWidth: borders.standard,
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xs,
   },
   micIconCircleActive: {
     backgroundColor: colors.primaryLight,
     borderColor: colors.primary,
+  },
+  micIconCircleProcessing: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#F59E0B',
+  },
+  micIconCircleSuccess: {
+    backgroundColor: '#ECFDF5',
+    borderColor: colors.success,
   },
   title: {
     fontSize: typography.h2.fontSize,
@@ -812,7 +780,13 @@ const styles = StyleSheet.create({
   },
   liveCardActive: {
     borderColor: colors.primary,
+    borderWidth: 2,
     backgroundColor: '#FFF5F5',
+  },
+  liveCardSuccess: {
+    borderColor: colors.success,
+    borderWidth: 2,
+    backgroundColor: '#ECFDF5',
   },
   liveCardTop: {
     flexDirection: 'row',
@@ -825,9 +799,9 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   recordingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: colors.primary,
   },
   liveLabel: {
@@ -840,10 +814,13 @@ const styles = StyleSheet.create({
   liveLabelActive: {
     color: colors.primary,
   },
+  liveLabelSuccess: {
+    color: colors.success,
+  },
   liveBadge: {
     backgroundColor: colors.primaryLight,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.primary,
@@ -854,6 +831,20 @@ const styles = StyleSheet.create({
     color: colors.primary,
     letterSpacing: 0.4,
   },
+  successBadge: {
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.success,
+  },
+  successBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.success,
+    letterSpacing: 0.4,
+  },
   liveText: {
     fontSize: 24,
     lineHeight: 32,
@@ -861,39 +852,59 @@ const styles = StyleSheet.create({
     color: colors.text,
     textAlign: 'center',
   },
-  transcriptCard: {
+  liveTextSuccess: {
+    color: '#065F46',
+  },
+  successHelperText: {
+    fontSize: typography.caption.fontSize,
+    fontWeight: '600',
+    color: '#047857',
+    textAlign: 'center',
+  },
+  transcriptPlaceholder: {
+    color: colors.textSoft,
+    fontWeight: '500',
+  },
+  candidatesCard: {
     backgroundColor: colors.surface,
     borderWidth: borders.standard,
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.md,
-    gap: spacing.xxs,
+    gap: spacing.sm,
     ...shadows.sm,
   },
-  transcriptLabel: {
-    fontSize: typography.caption.fontSize,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  transcriptText: {
+  candidatesTitle: {
     fontSize: typography.body.fontSize,
-    lineHeight: typography.body.lineHeight,
     fontWeight: '700',
     color: colors.text,
   },
-  transcriptPlaceholder: {
-    color: colors.textSoft,
-    fontWeight: '500',
+  candidatesList: {
+    gap: spacing.xs,
+  },
+  alertNoticeError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    padding: spacing.md,
+    borderRadius: radius.md,
+  },
+  errorText: {
+    fontSize: typography.bodySecondary.fontSize,
+    color: colors.error,
+    fontWeight: '700',
+    flex: 1,
   },
   statusCard: {
     backgroundColor: colors.surface,
     borderWidth: borders.standard,
     borderColor: colors.border,
     borderRadius: radius.md,
-    padding: spacing.lg,
-    gap: spacing.xs,
+    padding: spacing.md,
+    gap: spacing.xxs,
     ...shadows.sm,
   },
   statusHeader: {
@@ -912,98 +923,6 @@ const styles = StyleSheet.create({
     fontSize: typography.h3.fontSize,
     fontWeight: typography.h3.fontWeight,
     color: colors.text,
-  },
-  statusHelperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginTop: spacing.xxs,
-  },
-  listeningText: {
-    fontSize: typography.bodySecondary.fontSize,
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  alertNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: '#FFFBEB',
-    padding: spacing.sm,
-    borderRadius: radius.sm,
-    marginTop: spacing.xxs,
-  },
-  alertNoticeError: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: '#FEF2F2',
-    padding: spacing.sm,
-    borderRadius: radius.sm,
-    marginTop: spacing.xxs,
-  },
-  warningText: {
-    fontSize: typography.bodySecondary.fontSize,
-    color: '#92400E',
-    fontWeight: '600',
-    flex: 1,
-  },
-  infoNoticeText: {
-    fontSize: typography.bodySecondary.fontSize,
-    color: '#1E40AF',
-    fontWeight: '600',
-    flex: 1,
-  },
-  errorText: {
-    fontSize: typography.bodySecondary.fontSize,
-    color: colors.error,
-    fontWeight: '600',
-    flex: 1,
-  },
-  confirmationCard: {
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    borderRadius: radius.md,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  confirmationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  confirmationLabel: {
-    fontSize: typography.caption.fontSize,
-    fontWeight: '800',
-    color: '#065F46',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  confirmationValue: {
-    fontSize: typography.h2.fontSize,
-    lineHeight: typography.h2.lineHeight,
-    fontWeight: '900',
-    color: '#065F46',
-  },
-  suggestionsCard: {
-    backgroundColor: colors.surface,
-    borderWidth: borders.standard,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.lg,
-    gap: spacing.sm,
-    ...shadows.sm,
-  },
-  suggestionsTitle: {
-    fontSize: typography.caption.fontSize,
-    fontWeight: '800',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  suggestionsList: {
-    gap: spacing.xs,
   },
   manualCard: {
     backgroundColor: colors.surface,

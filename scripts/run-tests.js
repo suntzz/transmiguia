@@ -206,6 +206,20 @@ async function runAllSuites() {
       assert(res.station !== null, 'Debe resolver estacion');
       assert.strictEqual(res.station.name, 'Portal Norte');
     });
+
+    test('Resuelve frases conversacionales con prefijos (quiero ir a, estacion, voy para)', () => {
+      const terrerosRes = resolveStationFromSpeechList('quiero ir a terreros', transmilenioStations);
+      assert(terrerosRes.station !== null, 'Debe resolver terreros con prefijo');
+      assert.strictEqual(terrerosRes.station.name, 'Terreros - Hospital C.V.');
+
+      const calle72Res = resolveStationFromSpeechList('estacion calle 72', transmilenioStations);
+      assert(calle72Res.station !== null, 'Debe resolver calle 72 con prefijo');
+      assert.strictEqual(calle72Res.station.name, 'Calle 72');
+
+      const banderasRes = resolveStationFromSpeechList('voy para banderas', transmilenioStations);
+      assert(banderasRes.station !== null, 'Debe resolver banderas con prefijo');
+      assert.strictEqual(banderasRes.station.name, 'Banderas');
+    });
   });
 
   // --- Suite 3: Catalogo de Datos Estaciones ---

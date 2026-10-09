@@ -127,6 +127,44 @@ export function searchStationsInList(
   );
 }
 
+function cleanSpeechCarrierPhrases(normalized: string): string {
+  let cleaned = normalized;
+  const prefixes = [
+    'quiero ir a la estacion ',
+    'quiero ir a la ',
+    'quiero ir a ',
+    'voy para la estacion ',
+    'voy para la ',
+    'voy para ',
+    'voy a la estacion ',
+    'voy a la ',
+    'voy a ',
+    'ir a la estacion ',
+    'ir a la ',
+    'ir a ',
+    'llevame a la estacion ',
+    'llevame a la ',
+    'llevame a ',
+    'hacia la estacion ',
+    'hacia la ',
+    'hacia ',
+    'para la estacion ',
+    'para la ',
+    'a la estacion ',
+    'estacion ',
+  ];
+
+  for (const prefix of prefixes) {
+    if (cleaned.startsWith(prefix)) {
+      cleaned = cleaned.slice(prefix.length).trim();
+      break;
+    }
+  }
+
+  cleaned = cleaned.replace(/\s+por favor$/, '').trim();
+  return cleaned;
+}
+
 export function resolveStationFromSpeechList(
   transcript: string,
   stations: TransmilenioStation[]
@@ -142,10 +180,13 @@ export function resolveStationFromSpeechList(
     };
   }
 
+  const cleanedTranscript = cleanSpeechCarrierPhrases(normalizedTranscript);
+
   const exactStation = stations.find((station) =>
-    getStationSearchTerms(station).some(
-      (term) => normalizeText(term) === normalizedTranscript
-    )
+    getStationSearchTerms(station).some((term) => {
+      const norm = normalizeText(term);
+      return norm === normalizedTranscript || (cleanedTranscript && norm === cleanedTranscript);
+    })
   );
 
   if (exactStation) {
@@ -160,7 +201,10 @@ export function resolveStationFromSpeechList(
   const scoredCandidates = stations
     .map((station) => ({
       station,
-      score: getStationMatchScore(station, normalizedTranscript),
+      score: Math.max(
+        getStationMatchScore(station, normalizedTranscript),
+        cleanedTranscript ? getStationMatchScore(station, cleanedTranscript) : 0
+      ),
     }))
     .filter((candidate) => candidate.score >= 56)
     .sort((left, right) => right.score - left.score);

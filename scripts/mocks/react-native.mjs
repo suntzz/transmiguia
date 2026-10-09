@@ -23,6 +23,8 @@ export const StyleSheet = {
 export const AccessibilityInfo = {
   announceForAccessibility: () => {},
   isScreenReaderEnabled: async () => false,
+  isReduceMotionEnabled: async () => false,
+  addEventListener: () => ({ remove: () => {} }),
 };
 
 export const PermissionsAndroid = {
@@ -63,12 +65,38 @@ export const Pressable = (props) => {
 export const TextInput = (props) => React.createElement('rn-text-input', normalizeProps(props));
 export const ScrollView = (props) => React.createElement('rn-scroll-view', normalizeProps(props), props.children);
 export const StatusBar = (props) => React.createElement('rn-status-bar', normalizeProps(props));
+class MockAnimatedValue {
+  constructor(val) {
+    this.val = val;
+  }
+  setValue(val) {
+    this.val = val;
+  }
+  interpolate() {
+    return this;
+  }
+}
+
+export const Animated = {
+  Value: MockAnimatedValue,
+  timing: () => ({ start: (cb) => { if (cb) cb({ finished: true }); }, stop: () => {} }),
+  loop: () => ({ start: (cb) => { if (cb) cb({ finished: true }); }, stop: () => {} }),
+  sequence: () => ({ start: (cb) => { if (cb) cb({ finished: true }); }, stop: () => {} }),
+  View: (props) => React.createElement('rn-animated-view', normalizeProps(props), props.children),
+};
+
+export const Easing = {
+  ease: () => {},
+  out: (fn) => fn,
+};
 
 export default {
   Platform,
   StyleSheet,
   AccessibilityInfo,
   PermissionsAndroid,
+  Animated,
+  Easing,
   View,
   Text,
   Pressable,
