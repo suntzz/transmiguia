@@ -23,10 +23,17 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Destination'>;
 
 export function DestinationScreen({ navigation, route }: Props) {
   const { destinationStation, originStation, tripFinished, resetTrip } = useRouteSelection();
-  const { demoAutoFlowEnabled, stopDemoPresentation } = useDemoMode();
+  const { demoAutoFlowEnabled, demoJourney, demoModeEnabled, stopDemoPresentation } =
+    useDemoMode();
   const suppressAutoSpeech = route.params?.suppressAutoSpeech === true;
-  const stopCount = originStation
-    ? countStationsBetween(originStation.name, destinationStation.name)
+
+  const effectiveDestination =
+    demoModeEnabled && demoJourney ? demoJourney.destinationStation : destinationStation;
+  const effectiveOrigin =
+    demoModeEnabled && demoJourney ? demoJourney.originStation : originStation;
+
+  const stopCount = effectiveOrigin
+    ? countStationsBetween(effectiveOrigin.name, effectiveDestination.name)
     : null;
 
   useScreenAnnouncement('Llegada a destino final. Tu recorrido concluyó con éxito.');
@@ -38,14 +45,14 @@ export function DestinationScreen({ navigation, route }: Props) {
     const announceArrival = async () => {
       if (!suppressAutoSpeech && !tripFinished) {
         await triggerSuccessHaptic();
-        await speakFinalDestinationArrival(destinationStation.name);
+        await speakFinalDestinationArrival(effectiveDestination.name);
       }
 
       if (cancelled) {
         return;
       }
 
-      if (demoAutoFlowEnabled) {
+      if (demoAutoFlowEnabled || demoModeEnabled) {
         stopDemoPresentation();
       }
     };
@@ -58,8 +65,9 @@ export function DestinationScreen({ navigation, route }: Props) {
     };
   }, [
     demoAutoFlowEnabled,
-    destinationStation.id,
-    destinationStation.name,
+    demoModeEnabled,
+    effectiveDestination.id,
+    effectiveDestination.name,
     stopDemoPresentation,
     suppressAutoSpeech,
     tripFinished,
@@ -71,7 +79,7 @@ export function DestinationScreen({ navigation, route }: Props) {
       <View
         accessible={true}
         accessibilityRole="header"
-        accessibilityLabel={`Llegaste a tu destino: ${destinationStation.name}. Recorrido finalizado exitosamente.`}
+        accessibilityLabel={`Llegaste a tu destino: ${effectiveDestination.name}. Recorrido finalizado exitosamente.`}
         style={styles.hero}>
         <View style={styles.checkCircle}>
           <Text style={styles.checkIcon}>✓</Text>
@@ -91,7 +99,7 @@ export function DestinationScreen({ navigation, route }: Props) {
           <View style={styles.destContentRow}>
             <MaterialIcons name="place" size={24} color={colors.primary} />
             <Text allowFontScaling={true} style={styles.destinationName}>
-              {destinationStation.name}
+              {effectiveDestination.name}
             </Text>
           </View>
         </View>
@@ -101,7 +109,7 @@ export function DestinationScreen({ navigation, route }: Props) {
       <View
         accessible={true}
         accessibilityRole="text"
-        accessibilityLabel={`Resumen del viaje: Abordaste en ${originStation?.name ?? 'la estación de origen'}. Cantidad de paradas: ${stopCount ?? 'completado'}.`}
+        accessibilityLabel={`Resumen del viaje: Abordaste en ${effectiveOrigin?.name ?? 'la estación de origen'}. Cantidad de paradas: ${stopCount ?? 'completado'}.`}
         style={styles.summaryCard}>
         <View style={styles.summaryHeader}>
           <MaterialIcons name="receipt-long" size={20} color={colors.textSecondary} />
@@ -116,7 +124,7 @@ export function DestinationScreen({ navigation, route }: Props) {
             <Text style={styles.summaryLabel}>Origen:</Text>
           </View>
           <Text allowFontScaling={true} style={styles.summaryValue}>
-            {originStation?.name ?? 'Estación de origen'}
+            {effectiveOrigin?.name ?? 'Estación de origen'}
           </Text>
         </View>
 
@@ -142,6 +150,7 @@ export function DestinationScreen({ navigation, route }: Props) {
           hint="Toca para reiniciar el flujo y planear otro recorrido"
           accessibilityLabel="Comenzar un nuevo viaje. Regresa al inicio."
           onPress={() => {
+            stopDemoPresentation();
             resetTrip();
             navigation.dispatch(
               CommonActions.reset({

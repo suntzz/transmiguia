@@ -7,66 +7,80 @@ import React, {
   useState,
 } from 'react';
 
+import {
+  RouteSelectionState,
+  clearRouteSelection,
+  createInitialRouteSelection,
+  selectDestination,
+} from '@/src/core/navigation/destinationFlow';
 import { TransmilenioStation, getAllStations } from '@/src/services/transmilenioService';
 
 type RouteContextValue = {
   originStation: TransmilenioStation | null;
+  /**
+   * Solo es un destino real cuando `hasSelectedDestination` es true. Antes de
+   * eso es un valor de relleno para mantener el tipado y NO debe anunciarse.
+   */
   destinationStation: TransmilenioStation;
   hasSelectedDestination: boolean;
   tripFinished: boolean;
   setOriginStation: (station: TransmilenioStation | null) => void;
   setDestinationStation: (station: TransmilenioStation) => void;
+  clearDestination: () => void;
   finishTrip: () => void;
   resetTrip: () => void;
 };
 
-const defaultDestination =
+const placeholderDestination =
   getAllStations({ includeInactive: false })[0] ?? getAllStations({ includeInactive: true })[0];
 
 const RouteContext = createContext<RouteContextValue | undefined>(undefined);
 
 export function RouteProvider({ children }: PropsWithChildren) {
-  const [originStation, setOriginStation] = useState<TransmilenioStation | null>(null);
-  const [destinationStation, setDestinationStationState] = useState<TransmilenioStation>(
-    defaultDestination!
+  const [selection, setSelection] = useState<RouteSelectionState>(() =>
+    createInitialRouteSelection(placeholderDestination!)
   );
-  const [hasSelectedDestination, setHasSelectedDestination] = useState(false);
-  const [tripFinished, setTripFinished] = useState(false);
+
+  const setOriginStation = useCallback((station: TransmilenioStation | null) => {
+    setSelection((current) => ({ ...current, originStation: station }));
+  }, []);
 
   const setDestinationStation = useCallback((station: TransmilenioStation) => {
-    setOriginStation(null);
-    setDestinationStationState(station);
-    setHasSelectedDestination(true);
-    setTripFinished(false);
+    setSelection((current) => selectDestination(current, station));
+  }, []);
+
+  const clearDestination = useCallback(() => {
+    setSelection((current) => clearRouteSelection(current, placeholderDestination!));
   }, []);
 
   const finishTrip = useCallback(() => {
-    setTripFinished(true);
+    setSelection((current) => ({ ...current, tripFinished: true }));
   }, []);
 
+  // Un viaje nuevo siempre empieza sin destino ni origen heredados del anterior.
   const resetTrip = useCallback(() => {
-    setTripFinished(false);
+    setSelection((current) => clearRouteSelection(current, placeholderDestination!));
   }, []);
 
   const value = useMemo(
     () => ({
-      originStation,
-      destinationStation,
-      hasSelectedDestination,
-      tripFinished,
+      originStation: selection.originStation,
+      destinationStation: selection.destinationStation,
+      hasSelectedDestination: selection.hasSelectedDestination,
+      tripFinished: selection.tripFinished,
       setOriginStation,
       setDestinationStation,
+      clearDestination,
       finishTrip,
       resetTrip,
     }),
     [
-      destinationStation,
+      clearDestination,
       finishTrip,
-      hasSelectedDestination,
-      originStation,
       resetTrip,
+      selection,
       setDestinationStation,
-      tripFinished,
+      setOriginStation,
     ]
   );
 

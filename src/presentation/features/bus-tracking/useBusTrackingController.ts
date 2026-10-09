@@ -68,12 +68,13 @@ export function useBusTrackingController({ navigation }: UseBusTrackingControlle
   const {
     demoAutoFlowEnabled,
     demoJourney,
+    demoModeEnabled,
     demoRunId,
     demoState,
     setDemoStep,
     updateDemoState,
   } = useDemoMode();
-  const isControlledDemo = demoAutoFlowEnabled && demoJourney != null;
+  const isControlledDemo = (demoAutoFlowEnabled || demoModeEnabled) && demoJourney != null;
   useStopDemoOnBack(isControlledDemo);
   const location = useLiveLocation();
   const { startTracking, stopTracking } = location;

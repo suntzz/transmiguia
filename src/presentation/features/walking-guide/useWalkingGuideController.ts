@@ -104,12 +104,13 @@ export function useWalkingGuideController({ navigation }: UseWalkingGuideControl
   const {
     demoAutoFlowEnabled,
     demoJourney,
+    demoModeEnabled,
     demoRunId,
     demoState,
     setDemoStep,
     updateDemoState,
   } = useDemoMode();
-  const isControlledDemo = demoAutoFlowEnabled && demoJourney != null;
+  const isControlledDemo = (demoAutoFlowEnabled || demoModeEnabled) && demoJourney != null;
   const latitude = location.coordinates?.latitude;
   const longitude = location.coordinates?.longitude;
   const [routeSummary, setRouteSummary] = useState<RouteSummary | null>(null);
@@ -224,13 +225,17 @@ export function useWalkingGuideController({ navigation }: UseWalkingGuideControl
 
   useFocusEffect(
     React.useCallback(() => {
-      void startTracking();
+      if (!isControlledDemo) {
+        void startTracking();
+      }
 
       return () => {
-        stopTracking();
+        if (!isControlledDemo) {
+          stopTracking();
+        }
         void stopSpeaking();
       };
-    }, [startTracking, stopTracking])
+    }, [isControlledDemo, startTracking, stopTracking])
   );
 
   useEffect(() => {

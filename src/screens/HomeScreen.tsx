@@ -203,9 +203,7 @@ export function HomeScreen({ navigation }: Props) {
                 return;
               }
 
-              startDemoPresentation(
-                hasSelectedDestination ? destinationStation.name : undefined
-              );
+              startDemoPresentation();
               void triggerSuccessHaptic();
               navigation.navigate('VoicePrototype');
             }}

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { useDemoMode } from '@/src/context/DemoModeContext';
-import { navigateToDemoStart } from '@/src/navigation/AppNavigator';
+import { navigateToDemoStart, returnToHomeFromDemo } from '@/src/navigation/AppNavigator';
 import { triggerSelectionHaptic } from '@/src/services/hapticsService';
 import { stopSpeaking } from '@/src/services/speechService';
 import { colors, radius, shadows, spacing, touchTargets } from '@/src/utils/theme';
@@ -87,6 +87,7 @@ export function ScreenContainer({
                   void triggerSelectionHaptic();
                   void stopSpeaking();
                   stopDemoPresentation();
+                  returnToHomeFromDemo();
                 }}
                 style={({ pressed }) => [
                   styles.demoButton,

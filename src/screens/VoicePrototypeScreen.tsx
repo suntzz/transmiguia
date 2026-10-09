@@ -3,6 +3,7 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -13,7 +14,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { AccessibleButton } from '@/src/components/AccessibleButton';
 import { ScreenContainer } from '@/src/components/ScreenContainer';
-import { useDemoMode } from '@/src/context/DemoModeContext';
+import { DEFAULT_DEMO_DESTINATION_NAME, useDemoMode } from '@/src/context/DemoModeContext';
 import { useRouteSelection } from '@/src/context/RouteContext';
 import {
   triggerMediumImpactHaptic,
@@ -65,12 +66,15 @@ export function VoicePrototypeScreen({ navigation }: Props) {
   const {
     destinationStation,
     hasSelectedDestination,
+    clearDestination,
     setOriginStation,
     setDestinationStation,
   } = useRouteSelection();
 
   const {
     demoModeEnabled,
+    demoVoiceTranscript,
+    activateDemoAutoFlow,
     prepareDemoJourney,
     setDemoStep,
   } = useDemoMode();
@@ -157,6 +161,12 @@ export function VoicePrototypeScreen({ navigation }: Props) {
     void refreshStationStatuses();
   }, []);
 
+  // Un recorrido nuevo nunca hereda el destino/origen de uno anterior:
+  // el destino solo existe cuando el usuario lo dice o lo selecciona.
+  useEffect(() => {
+    clearDestination();
+  }, [clearDestination]);
+
   // Safe navigation helper: awaits TTS completion before advancing
   const navigateToRoutePreview = useCallback(
     async (station: TransmilenioStation) => {
@@ -165,20 +175,31 @@ export function VoicePrototypeScreen({ navigation }: Props) {
       }
 
       hasNavigatedRef.current = true;
-      setDestinationStation(station);
+      if (!demoModeEnabled) {
+        setDestinationStation(station);
+      }
 
       if (demoModeEnabled) {
         const journey = prepareDemoJourney(station);
         if (journey) {
           setOriginStation(journey.originStation);
         }
+        activateDemoAutoFlow();
         setDemoStep('preview');
       }
 
       // Final screen replacement after speech has completely finished
       navigation.replace('RoutePreview');
     },
-    [demoModeEnabled, navigation, prepareDemoJourney, setDemoStep, setDestinationStation, setOriginStation]
+    [
+      activateDemoAutoFlow,
+      demoModeEnabled,
+      navigation,
+      prepareDemoJourney,
+      setDemoStep,
+      setDestinationStation,
+      setOriginStation,
+    ]
   );
 
   // Handle destination match result and execute the confirmation speech
@@ -298,16 +319,17 @@ export function VoicePrototypeScreen({ navigation }: Props) {
     const granted = await ensureVoicePermission();
     if (!granted) {
       setFlowState('PERMISSION_DENIED');
-      setErrorMessage('Permiso de micrófono no concedido. Puedes activarlo o escribir tu destino.');
+      const permMsg =
+        Platform.OS === 'web'
+          ? 'Permiso de micrófono no concedido en el navegador. Haz clic en el icono de permisos en la barra de direcciones o escribe tu destino.'
+          : 'Permiso de micrófono no concedido. Puedes activarlo o escribir tu destino.';
+      setErrorMessage(permMsg);
       await triggerWarningHaptic();
-      await speakManagedText(
-        'Permiso de micrófono no concedido. Puedes activarlo o escribir tu destino abajo.',
-        {
-          key: 'voice-permission-denied',
-          interrupt: true,
-          pauseMs: 400,
-        }
-      );
+      await speakManagedText(permMsg, {
+        key: 'voice-permission-denied',
+        interrupt: true,
+        pauseMs: 400,
+      });
       return;
     }
 
@@ -395,16 +417,6 @@ export function VoicePrototypeScreen({ navigation }: Props) {
         },
       });
 
-      // Verify native speech engine availability
-      const available = await isSpeechRecognitionAvailable();
-      if (!available) {
-        if (isMountedRef.current) {
-          setFlowState('ENGINE_UNAVAILABLE');
-          setErrorMessage('Reconocimiento de voz no disponible. Usa el campo manual.');
-        }
-        return;
-      }
-
       // STEP 1: Announce prompt clearly to the visually impaired user
       if (isMountedRef.current) {
         setFlowState('ANNOUNCING_PROMPT');
@@ -416,6 +428,41 @@ export function VoicePrototypeScreen({ navigation }: Props) {
         pauseMs: 400,
         ignoreGlobalCooldown: true,
       });
+
+      if (!isMountedRef.current || hasNavigatedRef.current) {
+        return;
+      }
+
+      // En modo demostración no se bloquea al usuario si no tiene permisos o motor de voz.
+      // Se simula la escucha y reconocimiento de la estación de prueba.
+      if (demoModeEnabled) {
+        const demoPhrase = demoVoiceTranscript?.trim() || DEFAULT_DEMO_DESTINATION_NAME;
+        setFlowState('LISTENING');
+        setPartialTranscript(demoPhrase);
+
+        await new Promise((resolve) => setTimeout(resolve, 800));
+
+        if (!isMountedRef.current || hasNavigatedRef.current) {
+          return;
+        }
+
+        await processRecognizedSpeech(demoPhrase);
+        return;
+      }
+
+      // Verify speech engine availability in normal mode
+      const available = await isSpeechRecognitionAvailable();
+      if (!available) {
+        if (isMountedRef.current) {
+          setFlowState('ENGINE_UNAVAILABLE');
+          setErrorMessage(
+            Platform.OS === 'web'
+              ? 'Tu navegador actual no tiene soporte para reconocimiento de voz continuo. Te recomendamos Google Chrome o escribir tu estación manualmente abajo.'
+              : 'Reconocimiento de voz no disponible en este dispositivo. Usa el campo manual.'
+          );
+        }
+        return;
+      }
 
       // STEP 2: Only after the spoken announcement completes, activate the real microphone
       if (isMountedRef.current && !hasNavigatedRef.current) {
@@ -430,7 +477,7 @@ export function VoicePrototypeScreen({ navigation }: Props) {
       void destroyVoiceRecognition();
       void stopSpeaking();
     };
-  }, [processRecognizedSpeech, startListeningSession]);
+  }, [demoModeEnabled, demoVoiceTranscript, processRecognizedSpeech, startListeningSession]);
 
   // Handle manual destination submission
   const handleManualSubmit = async () => {

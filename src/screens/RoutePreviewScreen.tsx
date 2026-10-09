@@ -5,13 +5,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 import { AccessibleButton } from '@/src/components/AccessibleButton';
 import { ScreenContainer } from '@/src/components/ScreenContainer';
-import { useDemoMode } from '@/src/context/DemoModeContext';
+import { DEFAULT_DEMO_DESTINATION_NAME, useDemoMode } from '@/src/context/DemoModeContext';
 import { useRouteSelection } from '@/src/context/RouteContext';
+import { buildRoutePreviewPlan } from '@/src/core/navigation/destinationFlow';
 import { logDemoEvent } from '@/src/services/demoService';
 import {
   speakAndWait,
   stopSpeaking,
 } from '@/src/services/speechService';
+import { getStationByName } from '@/src/services/transmilenioService';
 import { useScreenAnnouncement } from '@/src/hooks/useScreenAnnouncement';
 import { useStopDemoOnBack } from '@/src/hooks/useStopDemoOnBack';
 import { RootStackParamList } from '@/src/utils/navigation';
@@ -22,77 +24,123 @@ type Props = NativeStackScreenProps<RootStackParamList, 'RoutePreview'>;
 export function RoutePreviewScreen({ navigation }: Props) {
   useScreenAnnouncement('Resumen de ruta. Confirma la navegación antes de comenzar.');
   useStopDemoOnBack();
-  const { destinationStation, setOriginStation } = useRouteSelection();
+  const { destinationStation, hasSelectedDestination, setOriginStation } = useRouteSelection();
   const {
+    activateDemoAutoFlow,
     demoJourney,
     demoModeEnabled,
     demoRunId,
+    demoVoiceTranscript,
     prepareDemoJourney,
     restartDemoPresentation,
     setDemoStep,
     stopDemoPresentation,
   } = useDemoMode();
-  const [statusMessage, setStatusMessage] = useState('Generando ruta simulada...');
+  const [statusMessage, setStatusMessage] = useState('Verificando destino...');
   const hasAdvancedRef = useRef(false);
   const advanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const demoTargetStation = React.useMemo(() => {
+    if (!demoModeEnabled) {
+      return null;
+    }
+    const name = demoVoiceTranscript || DEFAULT_DEMO_DESTINATION_NAME;
+    return getStationByName(name, { includeInactive: false }) ?? null;
+  }, [demoModeEnabled, demoVoiceTranscript]);
+
+  // Solo existe una ruta anunciable si el usuario eligio un destino de forma
+  // explicita (voz o lista) o si estamos en modo demo con destino propio.
+  const previewPlan = buildRoutePreviewPlan({
+    hasSelectedDestination,
+    destinationStation,
+    demoModeEnabled,
+    demoJourney,
+    demoTargetStation,
+  });
+  const hasDestination = previewPlan.kind !== 'missing_destination';
+  const activeDemoJourney = previewPlan.kind === 'demo' ? demoJourney : null;
+
   const advanceToWalking = useCallback(() => {
-    if (hasAdvancedRef.current) {
+    if (hasAdvancedRef.current || (!hasSelectedDestination && !demoModeEnabled)) {
       return;
     }
 
     hasAdvancedRef.current = true;
+    if (demoModeEnabled) {
+      activateDemoAutoFlow();
+    }
     setDemoStep('walking');
     logDemoEvent('Step: WALKING');
     navigation.replace('WalkingGuide');
-  }, [navigation, setDemoStep]);
+  }, [activateDemoAutoFlow, demoModeEnabled, hasSelectedDestination, navigation, setDemoStep]);
 
   useEffect(() => {
     let cancelled = false;
 
     const runPreview = async () => {
       hasAdvancedRef.current = false;
-      setDemoStep('preview');
-      logDemoEvent('DEMO START', {
-        destination: destinationStation.name,
-        hasPreparedJourney: Boolean(demoJourney),
-      });
-      setStatusMessage('Simulando recorrido...');
 
-      const preparedJourney =
-        demoJourney ?? prepareDemoJourney(destinationStation);
-
-      if (!preparedJourney) {
-        logDemoEvent('Preview fallback failed', {
-          destination: destinationStation.name,
-        });
-        setStatusMessage(
-          'No pude preparar la ruta simulada. Puedes cambiar el destino o reiniciar la demo.'
-        );
-        return;
-      }
-
-      setOriginStation(preparedJourney.originStation);
-
-      await speakAndWait(
-        `Destino confirmado: ${destinationStation.name}. Iniciare la caminata hacia ${preparedJourney.originStation.name}.`,
-        {
-          key: `route-preview-${destinationStation.id}`,
+      if (previewPlan.kind === 'missing_destination') {
+        logDemoEvent('Preview blocked: no destination selected');
+        setStatusMessage('Falta elegir un destino');
+        await speakAndWait(previewPlan.spokenMessage, {
+          key: 'route-preview-missing-destination',
           minIntervalMs: 0,
           interrupt: true,
           pauseMs: 600,
+        });
+        return;
+      }
+
+      if (previewPlan.kind === 'demo_needs_journey') {
+        // El recorrido demo previo (si existe) pertenece a otro destino: se
+        // reconstruye. El cambio de estado vuelve a ejecutar este efecto con el
+        // recorrido correcto, y es entonces cuando se anuncia.
+        setDemoStep('preview');
+        const targetStation = demoTargetStation ?? destinationStation;
+        const preparedJourney = prepareDemoJourney(targetStation);
+
+        if (!preparedJourney) {
+          logDemoEvent('Preview fallback failed', {
+            destination: targetStation.name,
+          });
+          setStatusMessage(
+            'No pude preparar la ruta simulada. Puedes cambiar el destino o reiniciar la demo.'
+          );
         }
-      );
+        return;
+      }
+
+      const activeTargetStation =
+        previewPlan.kind === 'demo'
+          ? (activeDemoJourney?.destinationStation ?? demoTargetStation ?? destinationStation)
+          : destinationStation;
+
+      logDemoEvent('PREVIEW START', {
+        destination: activeTargetStation.name,
+        mode: previewPlan.kind,
+      });
+
+      if (previewPlan.kind === 'demo') {
+        setDemoStep('preview');
+        setOriginStation(previewPlan.originStation);
+        setStatusMessage('Simulando recorrido...');
+      } else {
+        setStatusMessage('Preparando guía peatonal...');
+      }
+
+      await speakAndWait(previewPlan.spokenMessage, {
+        key: `route-preview-${destinationStation.id}`,
+        minIntervalMs: 0,
+        interrupt: true,
+        pauseMs: 600,
+      });
 
       if (cancelled) {
         return;
       }
 
       advanceToWalking();
-
-      if (cancelled) {
-        return;
-      }
     };
 
     void runPreview();
@@ -105,12 +153,15 @@ export function RoutePreviewScreen({ navigation }: Props) {
       }
       void stopSpeaking();
     };
+    // previewPlan se recalcula en cada render; se usan sus entradas estables.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     advanceToWalking,
     demoJourney,
     demoModeEnabled,
     demoRunId,
     destinationStation,
+    hasSelectedDestination,
     navigation,
     prepareDemoJourney,
     setDemoStep,
@@ -144,11 +195,17 @@ export function RoutePreviewScreen({ navigation }: Props) {
 
           {/* Destination Focus Hero */}
           <View style={styles.stationBlock}>
-            <Text style={styles.station}>{destinationStation.name}</Text>
+            <Text style={styles.station}>
+              {previewPlan.kind === 'demo'
+                ? (activeDemoJourney?.destinationStation.name ?? demoTargetStation?.name ?? destinationStation.name)
+                : (hasSelectedDestination ? destinationStation.name : 'Sin destino seleccionado')}
+            </Text>
             <Text style={styles.helper}>
-              {demoJourney
-                ? `Salida simulada desde ${demoJourney.originStation.name}. La caminata irá hasta esa estación.`
-                : 'La caminata irá hacia la estación más cercana.'}
+              {!hasDestination
+                ? 'Di o selecciona una estación para iniciar la guía.'
+                : activeDemoJourney
+                  ? `Salida simulada desde ${activeDemoJourney.originStation.name}. La caminata irá hasta esa estación.`
+                  : 'La caminata irá hacia la estación más cercana.'}
             </Text>
           </View>
 
@@ -157,14 +214,16 @@ export function RoutePreviewScreen({ navigation }: Props) {
             <View style={styles.timelineItem}>
               <View style={styles.dotOrigin} />
               <Text style={styles.timelineText}>
-                {demoJourney ? demoJourney.originStation.name : 'Estación de origen'}
+                {activeDemoJourney ? activeDemoJourney.originStation.name : 'Estación de origen'}
               </Text>
             </View>
             <View style={styles.timelineLine} />
             <View style={styles.timelineItem}>
               <View style={styles.dotDestination} />
               <Text style={[styles.timelineText, styles.timelineDestinationText]}>
-                {destinationStation.name}
+                {previewPlan.kind === 'demo'
+                  ? (activeDemoJourney?.destinationStation.name ?? demoTargetStation?.name ?? destinationStation.name)
+                  : (hasSelectedDestination ? destinationStation.name : 'Destino por elegir')}
               </Text>
             </View>
           </View>
@@ -180,6 +239,7 @@ export function RoutePreviewScreen({ navigation }: Props) {
             icon="directions-walk"
             hint="Inicia la navegación peatonal asistida de inmediato"
             accessibilityLabel="Iniciar Guía Peatonal. Comenzar orientación paso a paso."
+            disabled={!hasDestination}
             onPress={() => {
               if (advanceTimeoutRef.current) {
                 clearTimeout(advanceTimeoutRef.current);

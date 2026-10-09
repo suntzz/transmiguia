@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 import { calculateDistanceBetweenCoordinates } from '@/src/core/geo/distance';
@@ -299,11 +300,12 @@ export async function getRouteToStation(
 ): Promise<RouteSummary> {
   const apiKey = getDirectionsApiKey();
 
-  if (!apiKey) {
-    throw buildMapError(
-      'MISSING_API_KEY',
-      'Falta configurar DIRECTIONS_API_KEY o EXPO_PUBLIC_GOOGLE_MAPS_DIRECTIONS_API_KEY.'
-    );
+  // En la web (o si no hay clave de Directions configurada), las peticiones directas
+  // desde el navegador fallan por restricciones de CORS de la API de Google.
+  // Proporcionamos una ruta peatonal accesible inmediata sin bloquear la pantalla ni disparar fallos de red.
+  if (Platform.OS === 'web' || !apiKey) {
+    logDirections('Calculando ruta peatonal accesible local (web o sin clave externa)');
+    return createFallbackWalkingRoute(origin, destination);
   }
 
   const query = new URLSearchParams({

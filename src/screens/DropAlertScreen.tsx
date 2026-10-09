@@ -23,8 +23,11 @@ type Props = NativeStackScreenProps<RootStackParamList, 'DropAlert'>;
 
 export function DropAlertScreen({ navigation }: Props) {
   const { destinationStation } = useRouteSelection();
-  const { demoAutoFlowEnabled } = useDemoMode();
-  useStopDemoOnBack(demoAutoFlowEnabled);
+  const { demoAutoFlowEnabled, demoJourney, demoModeEnabled } = useDemoMode();
+  useStopDemoOnBack(demoAutoFlowEnabled || demoModeEnabled);
+
+  const activeDestination =
+    demoModeEnabled && demoJourney ? demoJourney.destinationStation : destinationStation;
 
   useScreenAnnouncement('Alerta importante: Una parada restante. Prepárate para descender.');
 
@@ -35,9 +38,9 @@ export function DropAlertScreen({ navigation }: Props) {
       const runDropAlert = async () => {
         await triggerWarningHaptic();
         await speakAndWait(
-          `¡Prepárate! Estás cerca de tu parada. La próxima estación es ${destinationStation.name}. Acércate a la puerta con precaución.`,
+          `¡Prepárate! Estás cerca de tu parada. La próxima estación es ${activeDestination.name}. Acércate a la puerta con precaución.`,
           {
-            key: `prepare-exit-${destinationStation.id}`,
+            key: `prepare-exit-${activeDestination.id}`,
             minIntervalMs: 0,
             interrupt: true,
             pauseMs: 900,
@@ -63,7 +66,7 @@ export function DropAlertScreen({ navigation }: Props) {
         cancelled = true;
         void stopSpeaking();
       };
-    }, [demoAutoFlowEnabled, destinationStation.id, destinationStation.name, navigation])
+    }, [activeDestination.id, activeDestination.name, demoAutoFlowEnabled, navigation])
   );
 
   return (
@@ -72,7 +75,7 @@ export function DropAlertScreen({ navigation }: Props) {
       <View
         accessible={true}
         accessibilityRole="alert"
-        accessibilityLabel={`Atención: Una parada restante para llegar a tu destino ${destinationStation.name}. Prepárate para descender.`}
+        accessibilityLabel={`Atención: Una parada restante para llegar a tu destino ${activeDestination.name}. Prepárate para descender.`}
         style={styles.heroAlertCard}>
         <View style={styles.topRow}>
           <View style={styles.iconCircle}>
@@ -98,7 +101,7 @@ export function DropAlertScreen({ navigation }: Props) {
       <View
         accessible={true}
         accessibilityRole="text"
-        accessibilityLabel={`Próxima parada: ${destinationStation.name}. Acércate a la puerta con precaución.`}
+        accessibilityLabel={`Próxima parada: ${activeDestination.name}. Acércate a la puerta con precaución.`}
         style={styles.instructionCard}>
         <View style={styles.instructionHeader}>
           <MaterialIcons name="exit-to-app" size={22} color={colors.primary} />
@@ -109,7 +112,7 @@ export function DropAlertScreen({ navigation }: Props) {
 
         <Text allowFontScaling={true} style={styles.warningText}>
           Próxima estación:{' '}
-          <Text style={styles.stationHighlight}>{destinationStation.name}</Text>
+          <Text style={styles.stationHighlight}>{activeDestination.name}</Text>
         </Text>
 
         <View style={styles.divider} />
@@ -126,12 +129,12 @@ export function DropAlertScreen({ navigation }: Props) {
       <View style={styles.actions}>
         <AccessibleButton
           label="Confirmar llegada a estación"
-          subtitle={`El bus se ha detenido en ${destinationStation.name}`}
+          subtitle={`El bus se ha detenido en ${activeDestination.name}`}
           variant="primary"
           size="large"
           icon="check-circle"
           hint="Toca cuando el bus se haya detenido en tu estación"
-          accessibilityLabel={`Confirmar que el bus llegó a ${destinationStation.name}. Descender con precaución.`}
+          accessibilityLabel={`Confirmar que el bus llegó a ${activeDestination.name}. Descender con precaución.`}
           onPress={() => navigation.replace('Destination')}
         />
 

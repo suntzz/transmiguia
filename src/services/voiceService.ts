@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
@@ -119,15 +120,29 @@ export function normalizeVoiceErrorMessage(error: string, message?: string): str
   }
 
   if (combined.includes('audio-capture') || combined.includes('audio capture')) {
-    return 'No fue posible capturar audio. Verifica el micrófono.';
+    return 'No fue posible capturar audio. Verifica que tu micrófono esté conectado.';
   }
 
   if (combined.includes('not-allowed') || combined.includes('not allowed')) {
+    if (Platform.OS === 'web') {
+      return 'Permiso de micrófono denegado en el navegador. Haz clic en el icono de permisos en la barra de direcciones para habilitarlo.';
+    }
     return 'Permiso de micrófono denegado. Ve a Configuración y actívalo.';
   }
 
+  if (combined.includes('browser-not-supported') || combined.includes('not supported')) {
+    return 'Tu navegador actual no tiene soporte para reconocimiento de voz continuo. Te recomendamos Google Chrome o escribir tu estación manualmente abajo.';
+  }
+
+  if (combined.includes('insecure-context')) {
+    return 'El micrófono del navegador requiere HTTPS o localhost para funcionar. Abre la aplicación en una conexión segura.';
+  }
+
   if (combined.includes('network')) {
-    return 'Error de red. Verifica tu conexión a internet e inténtalo de nuevo.';
+    if (Platform.OS === 'web') {
+      return 'El servicio de voz del navegador no pudo procesar el audio en la nube. Puedes reintentar o ingresar tu estación manualmente.';
+    }
+    return 'Error de red en el servicio de voz. Verifica tu conexión a internet o escribe el destino.';
   }
 
   if (combined.includes('nomatch') || combined.includes('no match')) {
@@ -139,18 +154,18 @@ export function normalizeVoiceErrorMessage(error: string, message?: string): str
     combined.includes('not returning results') ||
     combined.includes('sin resultados')
   ) {
-    return 'El motor de reconocimiento escuchó, pero no devolvió resultados. Verifica que el motor de voz de Google esté activo o escribe el destino manualmente.';
+    return 'El motor de reconocimiento escuchó, pero no devolvió resultados. Di el nombre de nuevo o escribe el destino manualmente.';
   }
 
   if (
     combined.includes('language-not-supported') ||
     combined.includes('language not supported')
   ) {
-    return 'El motor de voz no tiene disponible el idioma español en este momento. Verifica Speech Services de Google o descarga el paquete de español.';
+    return 'El motor de voz no tiene disponible el idioma español en este momento. Descarga el paquete de español o escribe tu destino.';
   }
 
   if (combined.includes('service-not-allowed') || combined.includes('service not allowed')) {
-    return 'El servicio de reconocimiento de voz no está disponible en este dispositivo.';
+    return 'El servicio de reconocimiento de voz no está habilitado en este dispositivo o navegador.';
   }
 
   return (
@@ -325,6 +340,16 @@ async function selectRecognitionCandidate(
 }
 
 export function isVoiceNativeModuleReady(): boolean {
+  if (Platform.OS === 'web') {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    return Boolean(
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition
+    );
+  }
+
   try {
     return ExpoSpeechRecognitionModule.isRecognitionAvailable();
   } catch {
@@ -333,6 +358,23 @@ export function isVoiceNativeModuleReady(): boolean {
 }
 
 export async function ensureVoicePermission(): Promise<boolean> {
+  if (Platform.OS === 'web') {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      logVoiceError('getUserMedia no soportado en este entorno de navegador');
+      return false;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Detener las pistas de audio para liberar el micrófono tras validar permiso
+      stream.getTracks().forEach((track) => track.stop());
+      return true;
+    } catch (error: any) {
+      logVoiceError('Permiso de micrófono denegado en la web', error);
+      return false;
+    }
+  }
+
   try {
     const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
     return granted;
@@ -342,7 +384,26 @@ export async function ensureVoicePermission(): Promise<boolean> {
   }
 }
 
+let webSpeechRecognitionInstance: any = null;
+let webVoiceCallbacks: VoiceServiceCallbacks | null = null;
+let webIsListening = false;
+let webLatestTranscript = '';
+let webFinalResultDelivered = false;
+let webNoResultsWatchdog: ReturnType<typeof setTimeout> | null = null;
+
+function clearWebWatchdog() {
+  if (webNoResultsWatchdog) {
+    clearTimeout(webNoResultsWatchdog);
+    webNoResultsWatchdog = null;
+  }
+}
+
 export async function configureVoiceRecognition(callbacks: VoiceServiceCallbacks): Promise<boolean> {
+  if (Platform.OS === 'web') {
+    webVoiceCallbacks = callbacks;
+    return true;
+  }
+
   try {
     await resetRecognizerSession(true);
     let latestHeardText = '';
@@ -524,6 +585,152 @@ export async function startVoiceRecognition(
   preferredLocale = 'es-CO',
   contextualStrings: string[] = []
 ): Promise<void> {
+  if (Platform.OS === 'web') {
+    if (typeof window === 'undefined') {
+      throw new Error('browser-not-supported');
+    }
+
+    const SpeechRecognitionClass =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionClass) {
+      throw new Error('browser-not-supported');
+    }
+
+    if (typeof window.isSecureContext === 'boolean' && !window.isSecureContext) {
+      throw new Error('insecure-context');
+    }
+
+    const granted = await ensureVoicePermission();
+    if (!granted) {
+      throw new Error('not-allowed');
+    }
+
+    if (webSpeechRecognitionInstance) {
+      try {
+        webSpeechRecognitionInstance.abort();
+      } catch {
+        // Ignorar
+      }
+      webSpeechRecognitionInstance = null;
+    }
+
+    clearWebWatchdog();
+    webIsListening = true;
+    webLatestTranscript = '';
+    webFinalResultDelivered = false;
+
+    const recognition = new SpeechRecognitionClass();
+    webSpeechRecognitionInstance = recognition;
+
+    recognition.lang = preferredLocale || 'es-CO';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 3;
+
+    recognition.onstart = () => {
+      logVoice('WEB VOICE START');
+      clearWebWatchdog();
+      webVoiceCallbacks?.onStart?.();
+
+      webNoResultsWatchdog = setTimeout(() => {
+        if (webIsListening && !webFinalResultDelivered && !webLatestTranscript.trim()) {
+          logVoiceError('Web speech watchdog: sin resultados tras 9s');
+          webVoiceCallbacks?.onError?.(
+            'engine-no-results',
+            'El motor de voz no devolvió resultados a tiempo'
+          );
+        }
+      }, 9000);
+    };
+
+    recognition.onaudiostart = () => {
+      logVoice('WEB VOICE AUDIO START');
+      webVoiceCallbacks?.onAudioStart?.();
+    };
+
+    recognition.onspeechstart = () => {
+      logVoice('WEB VOICE SPEECH START');
+      clearWebWatchdog();
+      webVoiceCallbacks?.onSpeechStart?.();
+    };
+
+    recognition.onspeechend = () => {
+      logVoice('WEB VOICE SPEECH END');
+      webVoiceCallbacks?.onSpeechEnd?.();
+    };
+
+    recognition.onresult = (event: any) => {
+      clearWebWatchdog();
+      let interim = '';
+      let final = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const res = event.results[i];
+        const text = res[0]?.transcript || '';
+        if (res.isFinal) {
+          final += text;
+        } else {
+          interim += text;
+        }
+      }
+
+      const activeText = (final || interim).trim();
+      if (activeText) {
+        webLatestTranscript = activeText;
+      }
+
+      if (interim && !final) {
+        logVoice('WEB VOICE PARTIAL', interim);
+        webVoiceCallbacks?.onPartialResults?.(interim);
+      }
+
+      if (final) {
+        logVoice('WEB VOICE FINAL', final);
+        webFinalResultDelivered = true;
+        webVoiceCallbacks?.onResults?.(final.trim());
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      clearWebWatchdog();
+      const err = event.error || 'error';
+      const msg = event.message || '';
+      logVoiceError('WEB VOICE ERROR', { err, msg });
+
+      if (err === 'aborted' && Date.now() <= ignoreAbortErrorsUntil) {
+        return;
+      }
+
+      webVoiceCallbacks?.onError?.(err, msg);
+    };
+
+    recognition.onend = () => {
+      clearWebWatchdog();
+      logVoice('WEB VOICE END', {
+        latestText: webLatestTranscript,
+        finalDelivered: webFinalResultDelivered,
+      });
+      webIsListening = false;
+
+      if (!webFinalResultDelivered && webLatestTranscript.trim()) {
+        logVoice('Promoviendo última transcripción parcial web a final', webLatestTranscript);
+        webFinalResultDelivered = true;
+        webVoiceCallbacks?.onResults?.(webLatestTranscript.trim());
+      }
+
+      webVoiceCallbacks?.onEnd?.();
+    };
+
+    try {
+      recognition.start();
+      return;
+    } catch (startError: any) {
+      logVoiceError('Error al iniciar SpeechRecognition en la web', startError);
+      throw startError;
+    }
+  }
+
   if (!isVoiceNativeModuleReady()) {
     throw new Error('Voice native module unavailable');
   }
@@ -591,6 +798,18 @@ export async function startVoiceRecognition(
 }
 
 export async function stopVoiceRecognition(): Promise<void> {
+  if (Platform.OS === 'web') {
+    clearWebWatchdog();
+    if (webSpeechRecognitionInstance) {
+      try {
+        webSpeechRecognitionInstance.stop();
+      } catch {
+        // Ignorar
+      }
+    }
+    return;
+  }
+
   try {
     ExpoSpeechRecognitionModule.stop();
   } catch (error) {
@@ -599,6 +818,20 @@ export async function stopVoiceRecognition(): Promise<void> {
 }
 
 export async function cancelVoiceRecognition(): Promise<void> {
+  if (Platform.OS === 'web') {
+    ignoreAbortErrorsUntil = Date.now() + 1500;
+    clearWebWatchdog();
+    if (webSpeechRecognitionInstance) {
+      try {
+        webSpeechRecognitionInstance.abort();
+      } catch {
+        // Ignorar
+      }
+      webSpeechRecognitionInstance = null;
+    }
+    return;
+  }
+
   try {
     ignoreAbortErrorsUntil = Date.now() + 1500;
     ExpoSpeechRecognitionModule.abort();
@@ -608,6 +841,12 @@ export async function cancelVoiceRecognition(): Promise<void> {
 }
 
 export async function destroyVoiceRecognition(): Promise<void> {
+  if (Platform.OS === 'web') {
+    await cancelVoiceRecognition();
+    webVoiceCallbacks = null;
+    return;
+  }
+
   try {
     ignoreAbortErrorsUntil = Date.now() + 1500;
     ExpoSpeechRecognitionModule.abort();
@@ -623,6 +862,10 @@ export async function isSpeechRecognitionAvailable(): Promise<boolean> {
 }
 
 export async function getSpeechRecognitionServices(): Promise<string[]> {
+  if (Platform.OS === 'web') {
+    return ['web-speech-api'];
+  }
+
   try {
     const services = ExpoSpeechRecognitionModule.getSpeechRecognitionServices();
     return Array.isArray(services) ? services : [];

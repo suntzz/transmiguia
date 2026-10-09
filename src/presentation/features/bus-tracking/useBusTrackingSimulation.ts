@@ -79,7 +79,7 @@ export function useBusTrackingSimulation(options: UseBusTrackingSimulationOption
       },
       onNavigateToDestination: () => {
         hasAutoNavigatedRef.current = true;
-        navigation.replace('Destination', { suppressAutoSpeech: true });
+        navigation.replace('DropAlert');
       },
     });
 

@@ -39,6 +39,19 @@ export function navigateToDemoStart() {
   );
 }
 
+export function returnToHomeFromDemo() {
+  if (!navigationRef.isReady()) {
+    return;
+  }
+
+  navigationRef.dispatch(
+    CommonActions.reset({
+      index: 0,
+      routes: [{ name: 'Home' }],
+    })
+  );
+}
+
 const navigationTheme = {
   ...DefaultTheme,
   colors: {

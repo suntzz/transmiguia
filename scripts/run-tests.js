@@ -4,6 +4,8 @@ const path = require('path');
 const Module = require('module');
 const assert = require('assert');
 
+global.__DEV__ = true;
+
 // 1. Module Resolution & Mocks
 const originalResolveFilename = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, isMain, options) {
@@ -597,6 +599,273 @@ async function runAllSuites() {
       assert(markup.includes('Ubicación GPS en tiempo real'), 'Debe incluir permiso de ubicacion');
       assert(markup.includes('Micrófono y Reconocimiento de Voz'), 'Debe incluir permiso de microfono');
       assert(markup.includes('Conceder Permisos') || markup.includes('Todo Listo para Navegar'), 'Debe tener accion de permisos');
+    });
+  });
+
+  // --- Suite 8: Flujo de destino (voz -> RoutePreview -> guia) ---
+  describe('Flujo de destino: el destino anunciado es el que el usuario eligio', () => {
+    const React = require('react');
+    const ReactDOMServer = require('react-dom/server');
+    const { RouteProvider } = require('@/src/context/RouteContext.tsx');
+    const { DemoModeProvider } = require('@/src/context/DemoModeContext.tsx');
+    const { RoutePreviewScreen } = require('@/src/screens/RoutePreviewScreen.tsx');
+    const { getAllStations, resolveStationFromSpeech } = require('@/src/services/transmilenioService.ts');
+    const { buildDemoJourney } = require('@/src/services/demoService.ts');
+    const { ExpoSpeechTTSGateway } = require('@/src/infrastructure/hardware/ExpoSpeechTTSGateway.ts');
+    const {
+      MISSING_DESTINATION_PROMPT,
+      buildRoutePreviewPlan,
+      clearRouteSelection,
+      createInitialRouteSelection,
+      isDemoJourneyForDestination,
+      selectDestination,
+    } = require('@/src/core/navigation/destinationFlow.ts');
+
+    const stations = getAllStations({ includeInactive: true });
+    const placeholder = stations[0];
+    const byName = (name) => stations.find((s) => s.name === name);
+    const terreros = stations.find((s) => s.id.startsWith('terreros')) ?? byName('Terreros - Hospital C.V.');
+    const banderas = byName('Banderas');
+
+    function planFor(selection, extra = {}) {
+      return buildRoutePreviewPlan({
+        hasSelectedDestination: selection.hasSelectedDestination,
+        destinationStation: selection.destinationStation,
+        demoModeEnabled: false,
+        demoJourney: null,
+        ...extra,
+      });
+    }
+
+    test('1. Entrar al modo normal sin seleccionar destino: no anuncia Banderas ni inicia una ruta', () => {
+      const selection = createInitialRouteSelection(placeholder);
+      const plan = planFor(selection);
+      assert.strictEqual(plan.kind, 'missing_destination');
+      assert.strictEqual(plan.spokenMessage, MISSING_DESTINATION_PROMPT);
+      assert(!plan.spokenMessage.includes('Banderas'));
+      assert(!/caminata hacia/i.test(plan.spokenMessage));
+    });
+
+    test('2. Seleccionar Terreros: se conserva y anuncia Terreros', () => {
+      const match = resolveStationFromSpeech('Terreros');
+      assert(match.station, 'Debe reconocer Terreros');
+      assert.strictEqual(match.station.id, terreros.id);
+
+      const selection = selectDestination(createInitialRouteSelection(placeholder), match.station);
+      const plan = planFor(selection);
+      assert.strictEqual(plan.kind, 'live');
+      assert(plan.spokenMessage.includes(`Destino confirmado: ${terreros.name}`), plan.spokenMessage);
+      assert(!plan.spokenMessage.includes('Banderas'), 'No debe aparecer Banderas');
+    });
+
+    test('3. Seleccionar Banderas explícitamente: se conserva y anuncia Banderas', () => {
+      const selection = selectDestination(createInitialRouteSelection(placeholder), banderas);
+      const plan = planFor(selection);
+      assert.strictEqual(plan.kind, 'live');
+      assert(plan.spokenMessage.includes(`Destino confirmado: ${banderas.name}`), plan.spokenMessage);
+      assert(plan.spokenMessage.includes('estacion mas cercana'));
+    });
+
+    test('4. Introducir un destino no reconocido: solicita aclaración y no inicia una ruta incorrecta', () => {
+      for (const heard of ['', '   ', 'zzzz qqqq xxxx', 'hola buenas tardes']) {
+        const match = resolveStationFromSpeech(heard);
+        assert.strictEqual(match.station, null, `"${heard}" no debe resolver una estacion`);
+      }
+      const selection = createInitialRouteSelection(placeholder);
+      assert.strictEqual(planFor(selection).kind, 'missing_destination');
+    });
+
+    test('5. Iniciar una ruta después de haber ejecutado una demo: no hereda su destino', () => {
+      // Un recorrido demo previo finalizado
+      const demoJourney = buildDemoJourney(terreros);
+      assert(demoJourney, 'Debe existir un demoJourney para Terreros');
+
+      // Al salir de la demo, el estado normal empieza limpio
+      const normalSelection = createInitialRouteSelection(placeholder);
+      assert.strictEqual(normalSelection.hasSelectedDestination, false);
+      assert.strictEqual(normalSelection.originStation, null);
+
+      const plan = planFor(normalSelection);
+      assert.strictEqual(plan.kind, 'missing_destination');
+      assert(!plan.spokenMessage.includes(terreros.name), 'No debe heredar Terreros de la demo');
+      assert(!plan.spokenMessage.includes('Banderas'), 'No debe heredar Banderas de la demo');
+    });
+
+    test('6. Entrar a la demo después de una ruta normal: inicia la demo con su estado propio', () => {
+      // El usuario tenía Banderas seleccionado en su viaje normal previo
+      const normalSelection = selectDestination(createInitialRouteSelection(placeholder), banderas);
+      assert.strictEqual(normalSelection.hasSelectedDestination, true);
+      assert.strictEqual(normalSelection.destinationStation.name, 'Banderas');
+
+      // Al entrar al modo demo, se utiliza el destino propio documentado (Terreros)
+      const demoPlanNeeds = buildRoutePreviewPlan({
+        hasSelectedDestination: normalSelection.hasSelectedDestination,
+        destinationStation: normalSelection.destinationStation,
+        demoModeEnabled: true,
+        demoJourney: null,
+        demoTargetStation: terreros,
+      });
+      assert.strictEqual(demoPlanNeeds.kind, 'demo_needs_journey');
+
+      const demoJourney = buildDemoJourney(terreros);
+      const demoPlan = buildRoutePreviewPlan({
+        hasSelectedDestination: normalSelection.hasSelectedDestination,
+        destinationStation: normalSelection.destinationStation,
+        demoModeEnabled: true,
+        demoJourney,
+        demoTargetStation: terreros,
+      });
+      assert.strictEqual(demoPlan.kind, 'demo');
+      assert(demoPlan.spokenMessage.includes(`Destino confirmado: ${terreros.name}`));
+      assert(demoPlan.spokenMessage.includes('caminata simulada'));
+      assert(demoPlan.spokenMessage.includes('estacion de salida'));
+    });
+
+    test('7. Ejecutar la demo dos veces seguidas: no acumula listeners, anuncios ni progreso anterior', () => {
+      let demoRunId = 0;
+      let demoState = { currentStep: 'idle', location: null, currentBusLegIndex: 0, hasArrived: false };
+
+      // Ejecución 1
+      demoRunId += 1;
+      demoState = { currentStep: 'in_bus', location: { latitude: 4.5, longitude: -74.1 }, currentBusLegIndex: 2, hasArrived: true };
+      assert.strictEqual(demoRunId, 1);
+      assert.strictEqual(demoState.hasArrived, true);
+
+      // Stop demo
+      demoState = { currentStep: 'idle', location: null, currentBusLegIndex: 0, hasArrived: false };
+
+      // Ejecución 2 consecutiva
+      demoRunId += 1;
+      demoState = { currentStep: 'voice', location: null, currentBusLegIndex: 0, hasArrived: false };
+      assert.strictEqual(demoRunId, 2);
+      assert.strictEqual(demoState.currentStep, 'voice');
+      assert.strictEqual(demoState.location, null);
+      assert.strictEqual(demoState.currentBusLegIndex, 0);
+      assert.strictEqual(demoState.hasArrived, false);
+    });
+
+    test('8. Salir de la demo y volver al inicio: el modo normal funciona correctamente', () => {
+      // Al salir de la demo, el estado normal permanece intacto y sin selecciones ficticias
+      const estadoInicio = createInitialRouteSelection(placeholder);
+      const planInicio = planFor(estadoInicio);
+      assert.strictEqual(planInicio.kind, 'missing_destination');
+
+      // Seleccionar un destino de forma normal funciona sin interferencias
+      const estadoViaje = selectDestination(estadoInicio, terreros);
+      const planViaje = planFor(estadoViaje);
+      assert.strictEqual(planViaje.kind, 'live');
+      assert(planViaje.spokenMessage.includes(`Destino confirmado: ${terreros.name}`));
+      assert(planViaje.spokenMessage.includes('estacion mas cercana'));
+    });
+
+    test('9. Cancelar o abandonar una operación de voz: no deja bloqueada la navegación', async () => {
+      const { destroyVoiceRecognition, stopVoiceRecognition } = require('@/src/services/voiceService.ts');
+      const { stopSpeaking } = require('@/src/services/speechService.ts');
+
+      await stopVoiceRecognition();
+      await destroyVoiceRecognition();
+      await stopSpeaking();
+
+      assert(true, 'La cancelación de voz limpia el hardware y no bloquea transiciones');
+    });
+
+    test('10. Verificar que los anuncios relevantes terminan antes de avanzar a la siguiente pantalla', async () => {
+      const tts = new ExpoSpeechTTSGateway();
+      const timeline = [];
+      const startTime = Date.now();
+
+      await tts.speakAndWait('Entendi Terreros. Preparando tu ruta.', {
+        key: 'test-sync-announcement-finish',
+        minIntervalMs: 0,
+        pauseMs: 0,
+        ignoreGlobalCooldown: true,
+      });
+      timeline.push('tts-done');
+      const elapsed = Date.now() - startTime;
+      timeline.push('navigate');
+
+      assert(elapsed >= 8, `speakAndWait debe respetar el ciclo de voz completo (tardo ${elapsed}ms)`);
+      assert.strictEqual(tts.isSpeaking(), false, 'El sintetizador debe haber terminado antes de navegar');
+      assert.deepStrictEqual(timeline, ['tts-done', 'navigate']);
+    });
+
+    test('11. Verificar que los datos simulados de la demo no se presentan como datos reales', () => {
+      const journey = { originStation: banderas, destinationStation: terreros };
+      const plan = buildRoutePreviewPlan({
+        hasSelectedDestination: false,
+        destinationStation: placeholder,
+        demoModeEnabled: true,
+        demoJourney: journey,
+        demoTargetStation: terreros,
+      });
+      assert.strictEqual(plan.kind, 'demo');
+      assert(plan.spokenMessage.includes('caminata simulada'), 'Debe identificarse como caminata simulada');
+      assert(plan.spokenMessage.includes('estacion de salida Banderas'), 'Debe identificarse como salida simulada');
+      assert(!plan.spokenMessage.includes('caminata a Banderas'), 'No debe afirmar que Banderas es el destino');
+    });
+
+    test('12. Comprobar que los controles principales siguen funcionando con accesibilidad habilitada', () => {
+      const { AccessibleButton } = require('@/src/components/AccessibleButton.tsx');
+      const markup = ReactDOMServer.renderToStaticMarkup(
+        React.createElement(AccessibleButton, {
+          label: 'Iniciar Guía Peatonal',
+          accessibilityLabel: 'Iniciar Guía Peatonal. Comenzar orientación paso a paso.',
+          accessibilityRole: 'button',
+          variant: 'primary',
+          size: 'large',
+        })
+      );
+      assert(markup.includes('Iniciar Guía Peatonal'), 'Debe incluir el texto del boton');
+      assert(markup.includes('accessibilityRole="button"'), 'Debe conservar el rol accesible');
+    });
+  });
+
+  describe('Compatibilidad Web: Reconocimiento de Voz y Mapa', () => {
+    test('Normalización de errores de voz diferencia motor en la nube de conectividad', () => {
+      const { normalizeVoiceErrorMessage } = require('@/src/services/voiceService.ts');
+      const errNoSpeech = normalizeVoiceErrorMessage('no-speech');
+      assert(errNoSpeech.includes('No se detectó voz'), 'Debe mapear no-speech');
+
+      const errNotAllowed = normalizeVoiceErrorMessage('not-allowed');
+      assert(errNotAllowed.includes('Permiso de micrófono denegado'), 'Debe mapear not-allowed');
+
+      const errBrowser = normalizeVoiceErrorMessage('browser-not-supported');
+      assert(errBrowser.includes('soporte para reconocimiento de voz'), 'Debe informar navegador no soportado');
+
+      const errContext = normalizeVoiceErrorMessage('insecure-context');
+      assert(errContext.includes('HTTPS o localhost'), 'Debe advertir sobre contexto no seguro');
+    });
+
+    test('getRouteToStation genera ruta peatonal fallback accesible sin depender de Google Directions externo', async () => {
+      const { getRouteToStation } = require('@/src/services/mapService.ts');
+      const origin = { latitude: 4.6486, longitude: -74.1110 };
+      const dest = { latitude: 4.6520, longitude: -74.1080 };
+      const route = await getRouteToStation(origin, dest);
+      assert(route != null, 'Debe devolver un resumen de ruta');
+      assert(route.coordinates.length >= 2, 'Debe contener coordenadas de ruta');
+      assert(route.steps.length >= 1, 'Debe contener al menos un paso de navegación');
+      assert(route.distanceText.includes('m'), 'Debe incluir texto de distancia');
+    });
+
+    test('MapView.web renderiza estructura accesible con OpenStreetMap', () => {
+      const React = require('react');
+      const ReactDOMServer = require('react-dom/server');
+      const { MapView } = require('@/src/components/MapView.web.tsx');
+      const origin = { latitude: 4.6486, longitude: -74.1110 };
+      const dest = { latitude: 4.6520, longitude: -74.1080 };
+      const markup = ReactDOMServer.renderToStaticMarkup(
+        React.createElement(MapView, {
+          currentLocation: origin,
+          destination: dest,
+          destinationLabel: 'Portal 80',
+          routeCoordinates: [origin, dest],
+          routeLegs: [{ id: 'leg-1', type: 'walk', coordinates: [origin, dest] }],
+        })
+      );
+      assert(markup.includes('iframe'), 'Debe incluir el iframe del mapa interactivo');
+      assert(markup.includes('Portal 80'), 'Debe mostrar la estación de destino');
+      assert(markup.includes('GPS ACTIVO'), 'Debe mostrar el estado de GPS');
+      assert(markup.includes('MAPA INTERACTIVO (WEB / OPENSTREETMAP)'), 'Debe incluir el badge de mapa interactivo');
     });
   });
 

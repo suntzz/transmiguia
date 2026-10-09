@@ -8,7 +8,7 @@ import React, {
 } from 'react';
 
 import { DemoJourney, buildDemoJourney, logDemoEvent } from '@/src/services/demoService';
-import { TransmilenioStation, getRandomStation } from '@/src/services/transmilenioService';
+import { TransmilenioStation } from '@/src/services/transmilenioService';
 import {
   DemoState,
   DemoStep,
@@ -38,6 +38,8 @@ type DemoModeContextValue = {
 };
 
 const DemoModeContext = createContext<DemoModeContextValue | undefined>(undefined);
+
+export const DEFAULT_DEMO_DESTINATION_NAME = 'Terreros';
 
 const INITIAL_DEMO_STATE: DemoState = {
   currentStep: 'idle',
@@ -96,9 +98,9 @@ export function DemoModeProvider({ children }: PropsWithChildren) {
   }, []);
 
   const startDemoPresentation = useCallback((transcript?: string) => {
-    const nextTranscript = transcript?.trim() || getRandomStation().name;
+    const nextTranscript = transcript?.trim() || DEFAULT_DEMO_DESTINATION_NAME;
     setDemoModeEnabled(true);
-    setDemoAutoFlowEnabled(false);
+    setDemoAutoFlowEnabled(true);
     setDemoVoiceTranscript(nextTranscript);
     setDemoRunId((current) => current + 1);
     setDemoJourney(null);
@@ -117,7 +119,10 @@ export function DemoModeProvider({ children }: PropsWithChildren) {
   }, []);
 
   const restartDemoPresentation = useCallback(() => {
-    const nextTranscript = demoVoiceTranscript?.trim() || demoJourney?.destinationStation.name || getRandomStation().name;
+    const nextTranscript =
+      demoVoiceTranscript?.trim() ||
+      demoJourney?.destinationStation.name ||
+      DEFAULT_DEMO_DESTINATION_NAME;
 
     setDemoModeEnabled(true);
     setDemoAutoFlowEnabled(true);

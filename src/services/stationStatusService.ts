@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -317,6 +318,12 @@ function getInactiveStationIdsFromOfficialHtml(html: string) {
 }
 
 async function tryOfficialHtmlStatusSource() {
+  if (Platform.OS === 'web') {
+    // Las peticiones del navegador a transmilenio.gov.co son bloqueadas por CORS.
+    // En la web usamos el catálogo oficial verificado local sin disparar fallos en consola.
+    return null;
+  }
+
   const inactiveStationIds = new Set<string>();
 
   for (const url of OFFICIAL_STATUS_SOURCE_URLS) {
